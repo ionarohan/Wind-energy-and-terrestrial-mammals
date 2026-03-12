@@ -1,14 +1,3 @@
----
-title: "Wind Energy/data"
-author: "Iona Rohan"
-date: "`r Sys.Date()`"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 Data files used in analyzing and plotting the effects of wind energy facilities on the habitat selection of terrestrial mammals in central New Mexico rangelands.
 
 # Covariates
