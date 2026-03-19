@@ -31,6 +31,10 @@ setwd(paste0(homewd, "data/"))
 
 # Read in edited .csv
 detHist <- read.csv(file = "mule deer detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -268,6 +272,8 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 
 # Check correlations between detection variables 
 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header=TRUE)
 # site-level variables 
 site.covs.cor <- site.covs %>% 
   select(max_trig_dist, NDVI_1_9km)
@@ -275,12 +281,13 @@ site.covs.cor <- site.covs %>%
 cor_site_covs <- cor(site.covs.cor, method='spearman')  
 # none correlated above |0.7|
 
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.csv")
 #  observation-level variables
-
 obs_cor <-cor(data.frame(
-  livestock = as.vector(obsCovs$livestock.count),
-  human = as.vector(obsCovs$people.active),
-  rain = as.vector(obsCovs$rain.month)
+  livestock = as.vector(obs.covs$livestock.count),
+  human = as.vector(obs.covs$people.active),
+  rain = as.vector(obs.covs$rain.month)
 ))
 # none correlated above |0.7|
 
@@ -360,7 +367,7 @@ occu.null.aicc - AICc(water.dist) #worse than null
 
 water.tank.dense <- occu( ~ max_trig_dist + NDVI_1_9km 
                           ~ water_tank_density_1_9_km, occu.odhe)       
-occu.null.aicc - AICc(water.tank) #worse than null 
+occu.null.aicc - AICc(water.tank.dense) #worse than null 
 
 #none proceed
 
