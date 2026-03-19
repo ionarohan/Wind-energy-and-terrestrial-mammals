@@ -4,7 +4,7 @@
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 05-March-2026 ##############
+########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
 ###########################################################
@@ -20,8 +20,8 @@ rm(list=ls())
   #is the homewd directory on line 24
 
 #Set home working directory
-# e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind Energy/"
-#homewd = "<insert your folder here and end with a forward slash>"
+# e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
+homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))

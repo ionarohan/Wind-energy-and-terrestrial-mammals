@@ -1,36 +1,36 @@
 ###########################################################
-############ Code for: base models for coyotes ############
+######### Code for: base models for striped skunks ########
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 09-March-2026 ##############
+########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
 ###########################################################
-####### NOTE:RUN THIS CODE AFTER "pre_model_code.R" #######
+###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
 ###########################################################
 
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 23.
 
 #Set home working directory
-#e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind Energy/"
+  #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
 homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
 ###########################################################
-# SETUP CODE FOR COYOTE OCCUPANCY MODELS #
+# SETUP CODE FOR STRIPED SKUNK OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "coyote detection hist.csv", 
+detHist <- read.csv(file = "skunk detection hist.csv", 
                     row.names = 1)
 
 # Change from integer to numeric
@@ -38,7 +38,7 @@ detHist %>%
   mutate(across(1:51, as.numeric))
 
 # Create detection history 
-occu.cala <- unmarkedFrameOccu(y=detHist, 
+occu.meme <- unmarkedFrameOccu(y=detHist, 
                                siteCovs = site.covs.scaled, 
                                obsCovs = obsCovs.scaled)
 
@@ -48,29 +48,41 @@ occu.cala <- unmarkedFrameOccu(y=detHist,
 
 #### Models with no change over all turbine variables ####
 
-Habitat <- occu( ~ human.active + cow.active 
-                 ~ 1, occu.cala, starts = c(2, 0, -3, 0))
+Habitat <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                 ~ herbaceous_cov, occu.meme)
 
-Bio_Com_Occu <- occu( ~ human.active + cow.active 
-                      ~ as.factor(biotic_com_2), occu.cala, 
-                        starts = c(1, 0, -3, 0, 0))
+Bio_Com <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                 ~ as.factor(biotic_com_2), occu.meme)
 
-Canopy_Cov <- occu( ~ human.active + cow.active 
-                    ~ canopy_cov, occu.cala, starts = c(1, 0, -3, 0, 0))
+
+Canopy_Cov <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                    ~ canopy_cov, occu.meme)
+
+Null <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+              ~ 1, occu.meme)
 
 ## The table with the comparison of the relative weight of evidence between
   #occupancy models separately ranked for the effect of each wind energy 
-  #variable on the probability of habitat selection (ψ) of coyotes is found 
-  #in Table S3.15.
+  #variable on the probability of habitat selection (ψ) of striped skunks is 
+  #found in Table S3.19.
 
 #### Turbine Interior Models ####
 
-Turbine_Int_Occu <- occu( ~ human.active + cow.active 
-                          ~ as.factor(turbine_interior), occu.cala)
+Turbine_Int_Occu <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                          ~  as.factor(turbine_interior), occu.meme)
 
-Bio_Com_X_Turbine_Int <- occu( ~ human.active + cow.active 
+Habitat_Add_Turbine_Int <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                                 ~ as.factor(turbine_interior) +
+                                   herbaceous_cov, occu.meme)
+
+Bio_Com_X_Turbine_Int <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
                                ~ as.factor(turbine_interior) *
-                                 as.factor(biotic_com_2), occu.cala)
+                                 as.factor(biotic_com_2), occu.meme)
+
+
+Grass_X_Turbine_Int <- occu( ~ veg_cover_cam + woodland_percent_1_3km 
+                             ~ as.factor(turbine_interior) *
+                               herbaceous_cov, occu.meme)
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -142,12 +154,57 @@ ci_table <- data.frame(
 
 ci_table
 
+# 85% CI for percent grass interaction 
+# Extract coefficients and VCOV matrix
+coef_est <- coef(Grass_X_Turbine_Int, type = "state")
+vcov_mat <- vcov(Grass_X_Turbine_Int, type = "state")
+
+# ---- NDVI effect OUTSIDE wind farm (reference = 0) 
+beta_outside <- coef_est["psi(herbaceous_cov)"]
+
+se_outside <- sqrt(
+  vcov_mat["psi(herbaceous_cov)", "psi(herbaceous_cov)"]
+)
+
+# ---- NDVI effect INSIDE wind farm (reference + interaction)
+beta_inside <- coef_est["psi(herbaceous_cov)"] +
+  coef_est["psi(as.factor(turbine_interior)1:herbaceous_cov)"]
+
+var_inside <-
+  vcov_mat["psi(herbaceous_cov)", "psi(herbaceous_cov)"] +
+  vcov_mat["psi(as.factor(turbine_interior)1:herbaceous_cov)",
+           "psi(as.factor(turbine_interior)1:herbaceous_cov)"] +
+  2 * vcov_mat["psi(herbaceous_cov)",
+               "psi(as.factor(turbine_interior)1:herbaceous_cov)"]
+
+se_inside <- sqrt(var_inside)
+
+# ---- z-scores for 85% CI 
+z <- qnorm(c(0.075, 0.925))
+
+# ---- Confidence intervals
+ci_outside <- beta_outside + z * se_outside
+ci_inside  <- beta_inside  + z * se_inside
+
+# ---- Tidy output 
+ci_table <- data.frame(
+  Turbine_Location = c("Outside wind farm", "Inside wind farm"),
+  Estimate = c(beta_outside, beta_inside),
+  CI_85_lower = c(ci_outside[1], ci_inside[1]),
+  CI_85_upper = c(ci_outside[2], ci_inside[2])
+)
+
+ci_table
+
 # AICc Table with all possible turbine interior models 
 
 model_list <- list(
-  "Null" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
+  "Grass percent" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Turbine interior" = Turbine_Int_Occu,
+  "Turbine interior + grass percent" = Habitat_Add_Turbine_Int,
+  "Turbine interior x grass percent" = Grass_X_Turbine_Int,
   "Turbine interior x biotic community" = Bio_Com_X_Turbine_Int
 )
 
@@ -155,6 +212,8 @@ model_list <- list(
 
 wind_pairs <- list(
   "Turbine interior" = "Null",
+  "Turbine interior + grass percent" = "Grass percent",
+  "Turbine interior x grass percent" = "Grass percent",
   "Turbine interior x biotic community" = "Biotic community"
 )
 
@@ -164,15 +223,22 @@ stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
 #### Turbine Visibility Models ####
 
-Turbine_Vis_Occu <- occu( ~ human.active + cow.active 
-                          ~ X50cm_turbine_vis, occu.cala)
+Turbine_Vis_Occu <- occu( ~ veg_cover_cam + woodland_percent_1_3km
+                          ~ X50cm_turbine_vis, occu.meme)
 
-Bio_Com_X_Turbine_Vis <- occu( ~ human.active + cow.active 
+Habitat_Add_Turbine_Vis  <- occu( ~ veg_cover_cam +
+                                    woodland_percent_1_3km 
+                                  ~ X50cm_turbine_vis + herbaceous_cov, 
+                                  occu.meme)
+
+Bio_Com_X_Turbine_Vis <- occu( ~ veg_cover_cam + 
+                                 woodland_percent_1_3km 
                                ~ X50cm_turbine_vis * as.factor(biotic_com_2), 
-                               occu.cala)
+                               occu.meme)
 
-Canopy_X_Turbine_Vis <- occu( ~ human.active + cow.active 
-                              ~ X50cm_turbine_vis * canopy_cov, occu.cala)
+Canopy_Cov_X_Turbine_Vis <- occu( ~ veg_cover_cam +
+                                    woodland_percent_1_3km 
+                                  ~ X50cm_turbine_vis * canopy_cov, occu.meme)
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -211,21 +277,31 @@ ci_table <- data.frame(
 
 ci_table
 
-# AICc Table with all possible turbine visibility models 
+Grass_X_Turbine_Vis <- occu( ~ veg_cover_cam +
+                               woodland_percent_1_3km ~
+                               X50cm_turbine_vis *
+                               herbaceous_cov, occu.meme)
+
+# AICc Table with all possible turbine Vis models 
 
 model_list <- list(
-  "Null" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
-  "Turbine visibility" = Turbine_Vis_Occu,
+  "Grass percent" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Canopy cover" = Canopy_Cov,
+  "Turbine visibility" = Turbine_Vis_Occu,
+  "Turbine visibility + grass percent" = Habitat_Add_Turbine_Vis,
+  "Turbine visibility x grass percent" = Grass_X_Turbine_Vis,
   "Turbine visibility x biotic community" = Bio_Com_X_Turbine_Vis,
-  "Turbine visibility x canopy cover" = Canopy_X_Turbine_Vis
+  "Turbine visibility x canopy cover" = Canopy_Cov_X_Turbine_Vis 
 )
 
 # Pair wind models with their matching non wind model
 
 wind_pairs <- list(
   "Turbine visibility" = "Null",
+  "Turbine visibility + grass percent" = "Grass percent",
+  "Turbine visibility x grass percent" = "Grass percent",
   "Turbine visibility x biotic community" = "Biotic community",
   "Turbine visibility x canopy cover" = "Canopy cover"
 )
@@ -234,19 +310,24 @@ wind_pairs <- list(
 stopifnot(all(names(wind_pairs) %in% names(model_list)))
 stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
-# The beta values (ß), standard errors, and 85% confidence intervals for 
-  #parameter estimates within the best-supported model describing the effect of
-  #the turbine visibile from 50 cm from the ground on the probability of 
-  #habitat selection (ψ) for coyotes are listed in Table S3.24.
-
 #### Turbine Distance Models ####
 
-Turbine_Dist_Occu <- occu( ~ human.active + cow.active 
-                           ~ turbine_dist, occu.cala)
+Turbine_Dist_Occu <- occu( ~ veg_cover_cam + woodland_percent_1_3km  
+                           ~ turbine_dist, occu.meme)
 
-Bio_Com_X_Turbine_Dist <- occu( ~ human.active + cow.active 
-                                ~ as.factor(biotic_com_2) * turbine_dist, 
-                                occu.cala)
+Habitat_Add_Turbine_Dist <- occu( ~ veg_cover_cam + 
+                                    woodland_percent_1_3km 
+                                  ~ turbine_dist + herbaceous_cov, 
+                                  occu.meme)
+
+Bio_Com_X_Turbine_Dist <- occu( ~ veg_cover_cam +
+                                  woodland_percent_1_3km 
+                                ~ turbine_dist * as.factor(biotic_com_2), 
+                                occu.meme)
+
+Grass_X_Turbine_Dist <- occu( ~ veg_cover_cam +
+                                woodland_percent_1_3km 
+                              ~ turbine_dist * herbaceous_cov, occu.meme)
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -258,14 +339,14 @@ se_grassland <- sqrt(vcov_mat["psi(turbine_dist)",
                               "psi(turbine_dist)"])
 
 beta_woodland <- coef_est["psi(turbine_dist)"] + 
-  coef_est["psi(as.factor(biotic_com_2)2:turbine_dist)"]
+  coef_est["psi(turbine_dist:as.factor(biotic_com_2)2)"]
 
 var_woodland <- 
   vcov_mat["psi(turbine_dist)", "psi(turbine_dist)"] +
-  vcov_mat["psi(as.factor(biotic_com_2)2:turbine_dist)",
-           "psi(as.factor(biotic_com_2)2:turbine_dist)"] +
+  vcov_mat["psi(turbine_dist:as.factor(biotic_com_2)2)",
+           "psi(turbine_dist:as.factor(biotic_com_2)2)"] +
   2 * vcov_mat["psi(turbine_dist)", 
-               "psi(as.factor(biotic_com_2)2:turbine_dist)"]
+               "psi(turbine_dist:as.factor(biotic_com_2)2)"]
 se_woodland <- sqrt(var_woodland)
 
 # z-scores for 85% CI
@@ -288,18 +369,22 @@ ci_table
 # AICc Table with all possible turbine distance models 
 
 model_list <- list(
-  "Habitat" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
+  "Herbaceous cover" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Turbine distance" = Turbine_Dist_Occu,
+  "Turbine distance + herbaceous cover" = Habitat_Add_Turbine_Dist,
+  "Turbine distance x herbaceous cover" = Grass_X_Turbine_Dist,
   "Turbine distance x biotic community" = Bio_Com_X_Turbine_Dist
 )
 
 # Pair wind models with their matching non wind model
 
 wind_pairs <- list(
-  "Turbine distance" = "Habitat",
-  "Turbine distance x biotic community" = 
-    "Biotic community"
+  "Turbine distance" = "Null",
+  "Turbine distance + herbaceous cover" = "Herbaceous cover",
+  "Turbine distance x herbaceous cover" = "Herbaceous cover",
+  "Turbine distance x biotic community" = "Biotic community"
 )
 
 # Ensure model_list matches wind_pairs
@@ -308,31 +393,44 @@ stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
 #### Turbine Density Models ####
 
-Turbine_Dense_Occu <- occu( ~ human.active + cow.active 
-                            ~ turbine_density_2_4km, occu.cala)
+Turbine_Dense_Occu <- occu( ~ veg_cover_cam + 
+                              woodland_percent_1_3km  
+                            ~ turbine_density_1_3km, occu.meme)
 
-Bio_Com_X_Turbine_Dense <- occu( ~ human.active + cow.active 
-                                 ~ as.factor(biotic_com_2) * 
-                                   turbine_density_2_4km, occu.cala)
+Habitat_Add_Turbine_Dense <- occu( ~ veg_cover_cam +
+                                     woodland_percent_1_3km 
+                                   ~ turbine_density_1_3km +
+                                     herbaceous_cov, occu.meme)
+
+Bio_Com_X_Turbine_Dense <- occu( ~ veg_cover_cam +
+                                   woodland_percent_1_3km 
+                                 ~ turbine_density_1_3km *
+                                   as.factor(biotic_com_2), occu.meme)
+
+Grass_X_Turbine_Dense <- occu( ~ veg_cover_cam +
+                                 woodland_percent_1_3km 
+                               ~ turbine_density_1_3km *
+                                 herbaceous_cov, occu.meme,
+                                 starts = c(-3,-1.5,3.3,4.6,-3,0.6,1))
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
 coef_est <- coef(Bio_Com_X_Turbine_Dense, type = "state")
 vcov_mat <- vcov(Bio_Com_X_Turbine_Dense, type = "state")
 
-beta_grassland <- coef_est["psi(turbine_density_2_4km)"]
-se_grassland <- sqrt(vcov_mat["psi(turbine_density_2_4km)", 
-                              "psi(turbine_density_2_4km)"])
+beta_grassland <- coef_est["psi(turbine_density_1_3km)"]
+se_grassland <- sqrt(vcov_mat["psi(turbine_density_1_3km)", 
+                              "psi(turbine_density_1_3km)"])
 
-beta_woodland <- coef_est["psi(turbine_density_2_4km)"] + 
-  coef_est["psi(as.factor(biotic_com_2)2:turbine_density_2_4km)"]
+beta_woodland <- coef_est["psi(turbine_density_1_3km)"] + 
+  coef_est["psi(turbine_density_1_3km:as.factor(biotic_com_2)2)"]
 
 var_woodland <- 
-  vcov_mat["psi(turbine_density_2_4km)", "psi(turbine_density_2_4km)"] +
-  vcov_mat["psi(as.factor(biotic_com_2)2:turbine_density_2_4km)",
-           "psi(as.factor(biotic_com_2)2:turbine_density_2_4km)"] +
-  2 * vcov_mat["psi(turbine_density_2_4km)", 
-               "psi(as.factor(biotic_com_2)2:turbine_density_2_4km)"]
+  vcov_mat["psi(turbine_density_1_3km)", "psi(turbine_density_1_3km)"] +
+  vcov_mat["psi(turbine_density_1_3km:as.factor(biotic_com_2)2)",
+           "psi(turbine_density_1_3km:as.factor(biotic_com_2)2)"] +
+  2 * vcov_mat["psi(turbine_density_1_3km)", 
+               "psi(turbine_density_1_3km:as.factor(biotic_com_2)2)"]
 se_woodland <- sqrt(var_woodland)
 
 # z-scores for 85% CI
@@ -350,23 +448,27 @@ ci_table <- data.frame(
   CI_85_upper = c(ci_grassland[2], ci_woodland[2])
 )
 
-ci_table 
+ci_table
 
 # AICc Table with all possible turbine density models 
 
 model_list <- list(
-  "Habitat" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
+  "Herbaceous cover" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Turbine density" = Turbine_Dense_Occu,
+  "Turbine density + herbaceous cover" = Habitat_Add_Turbine_Dense,
+  "Turbine density x herbaceous cover" = Grass_X_Turbine_Dense,
   "Turbine density x biotic community" = Bio_Com_X_Turbine_Dense
 )
 
 # Pair wind models with their matching non wind model
 
 wind_pairs <- list(
-  "Turbine density" = "Habitat",
-  "Turbine density x biotic community" = 
-    "Biotic community"
+  "Turbine density" = "Null",
+  "Turbine density + herbaceous cover" = "Herbaceous cover",
+  "Turbine density x herbaceous cover" = "Herbaceous cover",
+  "Turbine density x biotic community" = "Biotic community"
 )
 
 # Ensure model_list matches wind_pairs
@@ -375,12 +477,24 @@ stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
 #### Access Road Distance Models ####
 
-Turbine_Rd_Dist_Occu <- occu( ~ human.active + cow.active 
-                              ~ turbine_rd_dist, occu.cala)
+Turbine_Rd_Dist_Occu <- occu( ~ veg_cover_cam + 
+                                woodland_percent_1_3km 
+                              ~ turbine_rd_dist, occu.meme)
 
-Bio_Com_X_Turbine_Rd_Dist <- occu( ~ human.active + cow.active 
-                                   ~ as.factor(biotic_com_2) * turbine_rd_dist,
-                                   occu.cala)
+Habitat_Add_Turbine_Rd_Dist <- occu( ~ veg_cover_cam +
+                                       woodland_percent_1_3km 
+                                     ~ turbine_rd_dist +
+                                       herbaceous_cov, occu.meme)
+
+Bio_Com_X_Turbine_Rd_Dist <- occu( ~ veg_cover_cam +
+                                     woodland_percent_1_3km 
+                                   ~ turbine_rd_dist *
+                                     as.factor(biotic_com_2), occu.meme)
+
+Grass_X_Turbine_Rd_Dist <- occu( ~ veg_cover_cam +
+                                   woodland_percent_1_3km 
+                                 ~ turbine_rd_dist * herbaceous_cov, 
+                                 occu.meme)
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -392,14 +506,14 @@ se_grassland <- sqrt(vcov_mat["psi(turbine_rd_dist)",
                               "psi(turbine_rd_dist)"])
 
 beta_woodland <- coef_est["psi(turbine_rd_dist)"] + 
-  coef_est["psi(as.factor(biotic_com_2)2:turbine_rd_dist)"]
+  coef_est["psi(turbine_rd_dist:as.factor(biotic_com_2)2)"]
 
 var_woodland <- 
   vcov_mat["psi(turbine_rd_dist)", "psi(turbine_rd_dist)"] +
-  vcov_mat["psi(as.factor(biotic_com_2)2:turbine_rd_dist)",
-           "psi(as.factor(biotic_com_2)2:turbine_rd_dist)"] +
+  vcov_mat["psi(turbine_rd_dist:as.factor(biotic_com_2)2)",
+           "psi(turbine_rd_dist:as.factor(biotic_com_2)2)"] +
   2 * vcov_mat["psi(turbine_rd_dist)", 
-               "psi(as.factor(biotic_com_2)2:turbine_rd_dist)"]
+               "psi(turbine_rd_dist:as.factor(biotic_com_2)2)"]
 se_woodland <- sqrt(var_woodland)
 
 # z-scores for 85% CI
@@ -417,14 +531,17 @@ ci_table <- data.frame(
   CI_85_upper = c(ci_grassland[2], ci_woodland[2])
 )
 
-ci_table 
+ci_table
 
-# AICc Table with all possible access rd dist models 
+# AICc Table with all possible turbine rd distance models 
 
 model_list <- list(
-  "Null" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
+  "Herbaceous cover" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Turbine road distance" = Turbine_Rd_Dist_Occu,
+  "Turbine road distance + herbaceous cover" = Habitat_Add_Turbine_Rd_Dist,
+  "Turbine road distance x herbaceous cover" = Grass_X_Turbine_Rd_Dist,
   "Turbine road distance x biotic community" = Bio_Com_X_Turbine_Rd_Dist
 )
 
@@ -432,8 +549,9 @@ model_list <- list(
 
 wind_pairs <- list(
   "Turbine road distance" = "Null",
-  "Turbine road distance x biotic community" = 
-    "Biotic community"
+  "Turbine road distance + herbaceous cover" = "Herbaceous cover",
+  "Turbine road distance x herbaceous cover" = "Herbaceous cover",
+  "Turbine road distance x biotic community" = "Biotic community"
 )
 
 # Ensure model_list matches wind_pairs
@@ -442,31 +560,44 @@ stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
 #### Access Road Density Models ####
 
-Turbine_Rd_Dense_Occu <- occu( ~ human.active + cow.active 
-                               ~ turbine_rd_density_2_4km, occu.cala)
+Turbine_Rd_Dense_Occu <- occu( ~ veg_cover_cam + 
+                                 woodland_percent_1_3km 
+                               ~ turbine_rd_density_1_3km, occu.meme)
 
-Bio_Com_X_Turbine_Rd_Dense <- occu( ~ human.active + cow.active 
-                                    ~ as.factor(biotic_com_2) *
-                                      turbine_rd_density_2_4km, occu.cala)
+Habitat_Add_Turbine_Rd_Dense <- occu( ~ veg_cover_cam +
+                                        woodland_percent_1_3km 
+                                      ~ turbine_rd_density_1_3km +
+                                        herbaceous_cov, occu.meme)
+
+Bio_Com_X_Turbine_Rd_Dense <- occu( ~ veg_cover_cam +
+                                      woodland_percent_1_3km 
+                                    ~ turbine_rd_density_1_3km *
+                                      as.factor(biotic_com_2), occu.meme)
+
+Grass_X_Turbine_Rd_Dense <- occu( ~ veg_cover_cam +
+                                    woodland_percent_1_3km 
+                                  ~ turbine_rd_density_1_3km *
+                                    herbaceous_cov, occu.meme,
+                                    starts = c(0,-1,0.5,0.5,-4,1,0.5))
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
 coef_est <- coef(Bio_Com_X_Turbine_Rd_Dense, type = "state")
 vcov_mat <- vcov(Bio_Com_X_Turbine_Rd_Dense, type = "state")
 
-beta_grassland <- coef_est["psi(turbine_rd_density_2_4km)"]
-se_grassland <- sqrt(vcov_mat["psi(turbine_rd_density_2_4km)", 
-                              "psi(turbine_rd_density_2_4km)"])
+beta_grassland <- coef_est["psi(turbine_rd_density_1_3km)"]
+se_grassland <- sqrt(vcov_mat["psi(turbine_rd_density_1_3km)", 
+                              "psi(turbine_rd_density_1_3km)"])
 
-beta_woodland <- coef_est["psi(turbine_rd_density_2_4km)"] + 
-  coef_est["psi(as.factor(biotic_com_2)2:turbine_rd_density_2_4km)"]
+beta_woodland <- coef_est["psi(turbine_rd_density_1_3km)"] + 
+  coef_est["psi(turbine_rd_density_1_3km:as.factor(biotic_com_2)2)"]
 
 var_woodland <- 
-  vcov_mat["psi(turbine_rd_density_2_4km)", "psi(turbine_rd_density_2_4km)"] +
-  vcov_mat["psi(as.factor(biotic_com_2)2:turbine_rd_density_2_4km)",
-           "psi(as.factor(biotic_com_2)2:turbine_rd_density_2_4km)"] +
-  2 * vcov_mat["psi(turbine_rd_density_2_4km)", 
-               "psi(as.factor(biotic_com_2)2:turbine_rd_density_2_4km)"]
+  vcov_mat["psi(turbine_rd_density_1_3km)", "psi(turbine_rd_density_1_3km)"] +
+  vcov_mat["psi(turbine_rd_density_1_3km:as.factor(biotic_com_2)2)",
+           "psi(turbine_rd_density_1_3km:as.factor(biotic_com_2)2)"] +
+  2 * vcov_mat["psi(turbine_rd_density_1_3km)", 
+               "psi(turbine_rd_density_1_3km:as.factor(biotic_com_2)2)"]
 se_woodland <- sqrt(var_woodland)
 
 # z-scores for 85% CI
@@ -486,26 +617,36 @@ ci_table <- data.frame(
 
 ci_table 
 
-# AICc Table with all possible access rd density models 
+# AICc Table with all possible turbine rd density models 
 
 model_list <- list(
-  "Habitat" = Habitat,
-  "Biotic community" = Bio_Com_Occu,
+  "Herbaceous cover" = Habitat,
+  "Null" = Null,
+  "Biotic community" = Bio_Com,
   "Turbine road density" = Turbine_Rd_Dense_Occu,
+  "Turbine road density + herbaceous cover" = Habitat_Add_Turbine_Rd_Dense,
+  "Turbine road density x herbaceous cover" = Grass_X_Turbine_Rd_Dense,
   "Turbine road density x biotic community" = Bio_Com_X_Turbine_Rd_Dense
 )
 
 # Pair wind models with their matching non wind model
 
 wind_pairs <- list(
-  "Turbine road density" = "Habitat",
-  "Turbine road density x biotic community" = 
-    "Biotic community"
+  "Turbine road density" = "Null",
+  "Turbine road density + herbaceous cover" = "Herbaceous cover",
+  "Turbine road density x herbaceous cover" = "Herbaceous cover",
+  "Turbine road density x biotic community" = "Biotic community"
 )
 
 # Ensure model_list matches wind_pairs
 stopifnot(all(names(wind_pairs) %in% names(model_list)))
 stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+
+# The beta values (ß), standard errors, and 85% confidence intervals for 
+  #parameter estimates within the best-supported model describing the effect of
+  #the density of access roads in a 1.3 km squared radius surrounding the site 
+  #on the probability of habitat selection (ψ) for striped skunks are listed in 
+  #Table S3.31.
 
 #####################################################################
 # CREATE MODEL SELECTION TABLES #
@@ -591,17 +732,19 @@ final_table <- top_mods_df %>%
   left_join(pairwise_ER_df, by = "Model")
 
 # 7. Export tables to .csv files
-#write.csv(final_table, "coy_interior_table.csv", row.names = FALSE)
 
-#write.csv(final_table, "coy_turbine_vis.csv", row.names = FALSE)
+#write.csv(final_table, "skunk_turbine_interior.csv", row.names = FALSE)
 
-#write.csv(final_table, "coy_turbine_dist.csv", row.names = FALSE)
+#write.csv(final_table, "skunk_turbine_vis.csv", row.names = FALSE)
 
-#write.csv(final_table, "coy_turbine_density.csv", row.names = FALSE)
+#write.csv(final_table, "skunk_turbine_dist.csv", row.names = FALSE)
 
-#write.csv(final_table, "coy_turbine_rd_dist.csv", row.names = FALSE)
+#write.csv(final_table, "skunk_turbine_density.csv", row.names = FALSE)
 
-#write.csv(final_table, "coy_turbine_rd_density.csv", row.names = FALSE)
+#write.csv(final_table, "skunk_turbine_rd_dist.csv", row.names = FALSE)
+
+#write.csv(final_table, "skunk_turbine_rd_density.csv", row.names = FALSE)
+
 
 ########################################################
 ######################### END ##########################

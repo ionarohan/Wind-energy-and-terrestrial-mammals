@@ -6,22 +6,22 @@
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 09-March-2026 ##############
+########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
 ###########################################################
-####### NOTE:RUN THIS CODE AFTER "pre_model_code.R" #######
+###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
 ###########################################################
 
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 24.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 25.
 
 #Set home working directory
-# e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind Energy/"
+  # e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
 homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
