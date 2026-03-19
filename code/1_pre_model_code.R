@@ -90,7 +90,7 @@ scale_site_covs <- function(site_covs,
 }
 
 # Skip categorical variables in scaling 
-skip_vars <- c("biotic_com_2", "cam_moved", "turbine_interior")
+skip_vars <- c("site", "cam_number", "biotic_com_2", "cam_moved", "turbine_interior")
 
 scaled_out <- scale_site_covs(site.covs, skip_covs = skip_vars)
 
@@ -126,6 +126,10 @@ site.covs.scaled$max_trig_dist2 <- site.covs.scaled$max_trig_dist^2
 site.covs.scaled$tree_density_5_70_2 <- site.covs.scaled$tree_density_5_70^2
 
 site.covs.scaled$herbaceous_cov2 <- site.covs.scaled$herbaceous_cov^2
+
+#write site.covs.scaled
+saveRDS(site.covs.scaled, "site_covs_scaled.RData")
+
 
 # Insert observation-level covariates 
 
@@ -228,6 +232,9 @@ obsCovs = list(max.temp = max.temp[,3:53],
                badger.cam = badger.cam[,2:52]
 )
 
+#write obsCovs
+saveRDS(obsCovs, "obsCovs.RData")
+
 # Skip categorical observation-level covariates in scaling
 categorical_covs <- c(
   "precip.cat", "jackrabbit.cam", "badger.cam"
@@ -244,6 +251,9 @@ scale_matrix_manual_skip <- function(name, mat) {
 # Apply to all obsCovs using names
 obsCovs.scaled <- mapply(scale_matrix_manual_skip, names(obsCovs), obsCovs, 
                          SIMPLIFY = FALSE)
+
+#write  obsCovs.scaled
+saveRDS(obsCovs.scaled, "obsCovs_scaled.RData")
 
 # Store means and SDs for scaled covariates (exclude categorical ones)
 obsCovs.stats <- lapply(obsCovs[setdiff(names(obsCovs), categorical_covs)], 
