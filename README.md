@@ -6,7 +6,9 @@ Data Contributors: Iona M. Rohan, Theresa M. Laverty, Jennifer K. Frey.
 
 # Folders
 
-data - Contains raw data files and R scripts for handling data
+data - Contains raw data files for handling data
+
+code - Contains R scripts for each speices base model and wind model 
 
 figures - Contains plots of the variable effects in the base models and wind models.
 
