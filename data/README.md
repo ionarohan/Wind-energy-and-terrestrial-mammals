@@ -1,9 +1,4 @@
 
----
-title: "README"
-output: html_document
----
-
 Raw data files used in analyzing and plotting the effects of wind energy facilities on the habitat selection of terrestrial mammals in central New Mexico rangelands.
 
 # Covariates
