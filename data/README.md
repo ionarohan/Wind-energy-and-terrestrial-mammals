@@ -3,7 +3,7 @@ Raw data files used in analyzing and plotting the effects of wind energy facilit
 
 # Covariates
 
-Site-level variables are contained in the file "site_covs.csv", these variables do not change over the duration the site was surveyed. Observation-level variables are in separate .csv files and are unique to every 24-hour sampling occasion. The "1_pre_model_code.R" script must be run before all species base models, wind models, and plot creation, as it sets up the variables for use in the occupancy model framework.
+Site-level variables are contained in the file "site_covs.csv", these variables do not change over the duration the site was surveyed. Observation-level variables are in separate .csv files and are unique to every 24-hour sampling occasion. 
 
 # Detection histories 
 
