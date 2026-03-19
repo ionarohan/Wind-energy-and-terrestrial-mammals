@@ -1,8 +1,3 @@
----
-title: "README"
-output: html_document
----
-
 Code used for analyzing and plotting the effects of wind energy facilities on the habitat selection of terrestrial mammals in central New Mexico rangelands. Note that the "1_pre_model_code.R" script must be run before all species base models, wind models, and plot creation, as it sets up the variables for use in the occupancy model framework. 
 
 # Base Models
