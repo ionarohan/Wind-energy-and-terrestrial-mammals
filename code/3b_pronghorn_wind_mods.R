@@ -47,6 +47,154 @@ occu.anam <- unmarkedFrameOccu(y=detHist,
                                siteCovs = site.covs.scaled, 
                                obsCovs = obsCovs.scaled)
 
+#####################################################################
+# CREATE FUNCTION FOR MODEL SELECTION TABLES #
+#####################################################################
+
+occu_model_selection <- function(model_list, wind_pairs = NULL, 
+                                 file_name = NULL) {
+  
+  # 1. Create AICc selection table
+  
+  top_mods <- aictab(
+    cand.set = model_list,
+    modnames = names(model_list)
+  )
+  
+  top_mods_df <- as.data.frame(top_mods)
+  top_mods_df$Model <- as.character(top_mods_df$Modnames)
+  
+  # Extract weights
+  w <- top_mods_df$AICcWt
+  names(w) <- top_mods_df$Model
+  
+  # 2. Create CI function
+  
+  get_85CI <- function(model, type = "state") {
+    est <- try(coef(model, type = type), silent = TRUE)
+    if(inherits(est, "try-error") || length(est) == 0) return(NULL)
+    
+    vc <- try(vcov(model, type = type), silent = TRUE)
+    if(inherits(vc, "try-error")) return(NULL)
+    
+    se <- sqrt(diag(vc))
+    z <- qnorm(0.925)
+    
+    data.frame(
+      Parameter = names(est),
+      CI_string = sprintf("%.2f [%.2f, %.2f]",
+                          est, est - z*se, est + z*se)
+    )
+  }
+  
+  # 3. Compute CIs
+  ci_psi_list <- lapply(model_list, get_85CI, type = "state")
+  ci_det_list <- lapply(model_list, get_85CI, type = "det")
+  
+  pivot_ci_wide <- function(ci_list) {
+    df <- bind_rows(
+      lapply(names(ci_list), function(name) {
+        x <- ci_list[[name]]
+        if(!is.null(x)) x$Model <- name
+        x
+      })
+    )
+    
+    if(nrow(df) == 0) return(data.frame(Model = character(0)))
+    
+    df %>% pivot_wider(names_from = Parameter, values_from = CI_string)
+  }
+  
+  ci_psi_wide <- pivot_ci_wide(ci_psi_list)
+  ci_det_wide <- pivot_ci_wide(ci_det_list)
+  
+  if(ncol(ci_psi_wide) > 1) {
+    names(ci_psi_wide)[-1] <- paste0(names(ci_psi_wide)[-1], "_psi")
+  }
+  if(ncol(ci_det_wide) > 1) {
+    names(ci_det_wide)[-1] <- paste0(names(ci_det_wide)[-1], "_det")
+  }
+  
+  # 4. Calculate LRTs 
+  
+  llr_df <- NULL
+  
+  if(!is.null(wind_pairs)) {
+    llr_results <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      if(!(mod_with_wind %in% names(model_list)) ||
+         !(mod_without %in% names(model_list))) {
+        return(NULL)
+      }
+      
+      m1 <- model_list[[mod_without]]
+      m2 <- model_list[[mod_with_wind]]
+      
+      ll1 <- logLik(m1)
+      ll2 <- logLik(m2)
+      
+      lrt <- 2 * (ll2 - ll1)
+      
+      k1 <- attr(ll1, "df")
+      k2 <- attr(ll2, "df")
+      
+      if(is.null(k1) | is.null(k2)) {
+        k1 <- length(coef(m1))
+        k2 <- length(coef(m2))
+      }
+      
+      df_diff <- k2 - k1
+      pval <- pchisq(lrt, df = df_diff, lower.tail = FALSE)
+      
+      data.frame(
+        Model = mod_with_wind,
+        LRT_stat = as.numeric(lrt),
+        LRT_df = df_diff,
+        LRT_p = as.numeric(pval)
+      )
+    })
+    
+    llr_df <- bind_rows(llr_results)
+  }
+  
+  # 5. Calculate evidence ratios
+  
+  pairwise_ER_df <- NULL
+  
+  if(!is.null(wind_pairs)) {
+    pairwise_ER <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      ER <- if(all(c(mod_with_wind, mod_without) %in% names(w))) {
+        w[mod_with_wind] / w[mod_without]
+      } else NA
+      
+      data.frame(
+        Model = mod_with_wind,
+        Evidence_Ratio_vs_NonWind = ER
+      )
+    })
+    
+    pairwise_ER_df <- bind_rows(pairwise_ER)
+  }
+  
+  # 6. Merge everything
+  
+  final_table <- top_mods_df %>%
+    left_join(ci_psi_wide, by = "Model") %>%
+    left_join(ci_det_wide, by = "Model") %>%
+    left_join(llr_df, by = "Model") %>%
+    left_join(pairwise_ER_df, by = "Model")
+
+  # 7. Write CSV 
+    if(!is.null(file_name)) {
+    write.csv(final_table, file_name, row.names = FALSE)
+    }
+  
+}
+
+
 #################################################
 # CREATE THE WIND MODELS #
 #################################################
@@ -57,8 +205,8 @@ Habitat <- occu( ~ veg_cover_cam ~ slope, occu.anam)
 
 Bio_Com_Slope <- occu( ~ veg_cover_cam 
                        ~ as.factor(biotic_com_2) + slope, occu.anam,
-                         starts = c(-2, -5, -1, -3, -1)) 
-                        # large SE for biotic community parameter
+                       starts = c(-2, -5, -1, -3, -1)) 
+                      # large SE for biotic community parameter
 
 Canopy_Cov_Slope <- occu( ~ veg_cover_cam 
                           ~ canopy_cov + slope, occu.anam)
@@ -66,9 +214,9 @@ Canopy_Cov_Slope <- occu( ~ veg_cover_cam
 Null <- occu( ~ veg_cover_cam ~ 1, occu.anam)
 
 ## The table with the comparison of the relative weight of evidence between
-  #occupancy models separately ranked for the effect of each wind energy 
-  #variable on the probability of habitat selection (ψ) of pronghorn is found 
-  #in Table S3.14.
+#occupancy models separately ranked for the effect of each wind energy 
+#variable on the probability of habitat selection (ψ) of pronghorn is found 
+#in Table S3.14.
 
 # Read in site-level covariates
 site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
@@ -187,9 +335,12 @@ wind_pairs <- list(
   "Turbine interior x biotic community + slope" = "Biotic community + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_interior.csv"
+)
 
 #### Turbine Visibility Models ####
 
@@ -269,9 +420,12 @@ wind_pairs <- list(
   "Turbine visibility x canopy cover + slope" = "Canopy cover + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_vis.csv"
+)
 
 #### Turbine Distance Models ####
 
@@ -344,9 +498,12 @@ wind_pairs <- list(
     "Biotic community + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_dist.csv"
+)
 
 #### Turbine Density Models ####
 
@@ -419,9 +576,12 @@ wind_pairs <- list(
     "Biotic community + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_density.csv"
+)
 
 #### Access Road Distance Models ####
 
@@ -494,9 +654,12 @@ wind_pairs <- list(
     "Biotic community + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_rd_dist.csv"
+)
 
 #### Access Road Density Models ####
 
@@ -570,162 +733,12 @@ wind_pairs <- list(
     "Biotic community + slope"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
-
-
-#####################################################################
-# CREATE MODEL SELECTION TABLES #
-# RUN AFTER THE AICc TABLE IS CREATED FOR EACH GROUP OF WIND MODELS #
-#####################################################################
-
-# 1. Create AICc selection table
-
-top_mods <- aictab(
-    cand.set = model_list,
-    modnames = names(model_list)
-  )
-  
-top_mods_df <- as.data.frame(top_mods)
-top_mods_df$Model <- as.character(top_mods_df$Modnames)
-  
-  # Extract weights
-  w <- top_mods_df$AICcWt
-  names(w) <- top_mods_df$Model
-  
-# 2. Create CI function
-  
-get_85CI <- function(model, type = "state") {
-    est <- try(coef(model, type = type), silent = TRUE)
-    if(inherits(est, "try-error") || length(est) == 0) return(NULL)
-    
-    vc <- try(vcov(model, type = type), silent = TRUE)
-    if(inherits(vc, "try-error")) return(NULL)
-    
-    se <- sqrt(diag(vc))
-    z <- qnorm(0.925)
-    
-    data.frame(
-      Parameter = names(est),
-      CI_string = sprintf("%.2f [%.2f, %.2f]",
-                          est, est - z*se, est + z*se)
-    )
-  }
-  
-# 3. Compute CIs
-ci_psi_list <- lapply(model_list, get_85CI, type = "state")
-ci_det_list <- lapply(model_list, get_85CI, type = "det")
-  
-pivot_ci_wide <- function(ci_list) {
-    df <- bind_rows(
-      lapply(names(ci_list), function(name) {
-        x <- ci_list[[name]]
-        if(!is.null(x)) x$Model <- name
-        x
-      })
-    )
-    
-    if(nrow(df) == 0) return(data.frame(Model = character(0)))
-    
-    df %>% pivot_wider(names_from = Parameter, values_from = CI_string)
-  }
-  
-  ci_psi_wide <- pivot_ci_wide(ci_psi_list)
-  ci_det_wide <- pivot_ci_wide(ci_det_list)
-  
-  if(ncol(ci_psi_wide) > 1) {
-    names(ci_psi_wide)[-1] <- paste0(names(ci_psi_wide)[-1], "_psi")
-  }
-  if(ncol(ci_det_wide) > 1) {
-    names(ci_det_wide)[-1] <- paste0(names(ci_det_wide)[-1], "_det")
-  }
-  
-# 4. Calculate LRTs 
-
-llr_df <- NULL
-  
-  if(!is.null(wind_pairs)) {
-    llr_results <- lapply(names(wind_pairs), function(mod_with_wind) {
-      mod_without <- wind_pairs[[mod_with_wind]]
-      
-      if(!(mod_with_wind %in% names(model_list)) ||
-         !(mod_without %in% names(model_list))) {
-        return(NULL)
-      }
-      
-      m1 <- model_list[[mod_without]]
-      m2 <- model_list[[mod_with_wind]]
-      
-      ll1 <- logLik(m1)
-      ll2 <- logLik(m2)
-      
-      lrt <- 2 * (ll2 - ll1)
-      
-      k1 <- attr(ll1, "df")
-      k2 <- attr(ll2, "df")
-      
-      if(is.null(k1) | is.null(k2)) {
-        k1 <- length(coef(m1))
-        k2 <- length(coef(m2))
-      }
-      
-      df_diff <- k2 - k1
-      pval <- pchisq(lrt, df = df_diff, lower.tail = FALSE)
-      
-      data.frame(
-        Model = mod_with_wind,
-        LRT_stat = as.numeric(lrt),
-        LRT_df = df_diff,
-        LRT_p = as.numeric(pval)
-      )
-    })
-    
-    llr_df <- bind_rows(llr_results)
-  }
-  
-# 5. Calculate evidence ratios
-
-pairwise_ER_df <- NULL
-  
-  if(!is.null(wind_pairs)) {
-    pairwise_ER <- lapply(names(wind_pairs), function(mod_with_wind) {
-      mod_without <- wind_pairs[[mod_with_wind]]
-      
-      ER <- if(all(c(mod_with_wind, mod_without) %in% names(w))) {
-        w[mod_with_wind] / w[mod_without]
-      } else NA
-      
-      data.frame(
-        Model = mod_with_wind,
-        Evidence_Ratio_vs_NonWind = ER
-      )
-    })
-    
-    pairwise_ER_df <- bind_rows(pairwise_ER)
-  }
-  
-# 6. Merge everything
-
-final_table <- top_mods_df %>%
-    left_join(ci_psi_wide, by = "Model") %>%
-    left_join(ci_det_wide, by = "Model") %>%
-    left_join(llr_df, by = "Model") %>%
-    left_join(pairwise_ER_df, by = "Model")
-  
-# 7. Export tables to .csv files
-  
-#write.csv(final_table, "prong_turbine_interior.csv", row.names = FALSE)
-  
-#write.csv(final_table, "prong_turbine_vis.csv", row.names = FALSE)
-  
-#write.csv(final_table, "prong_turbine_dist.csv", row.names = FALSE)
-  
-#write.csv(final_table, "prong_turbine_density.csv", row.names = FALSE)
-  
-#write.csv(final_table, "prong_turbine_rd_dist.csv", row.names = FALSE)
-  
-#write.csv(final_table, "prong_turbine_rd_density.csv", row.names = FALSE)
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = "prong_turbine_rd_density.csv"
+)
   
 ########################################################
 ######################### END ##########################
