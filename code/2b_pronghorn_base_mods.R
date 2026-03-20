@@ -26,6 +26,7 @@ library(tidyverse)
 library(unmarked)
 library(MuMIn)
 library(xlsx)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR PRONGHORN OCCUPANCY MODELS #
@@ -246,7 +247,7 @@ site.covs.cor <- site.covs %>%
   select(tree_density_5_70, veg_cover_cam)
 
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
-#correlated = 0.87 (use veg cover cam)
+# correlated = 0.87 (use veg cover cam)
 
 # Null model
 mod_null <- occu( ~ 1 ~ 1, occu.anam)
@@ -255,13 +256,14 @@ mod_null <- occu( ~ 1 ~ 1, occu.anam)
 mod1 <- occu( ~ veg_cover_cam ~ 1, occu.anam)
 
 # Model selection
-top_mods <- model.sel(mod1, mod_null)
+cand.models <- list(mod1, mod_null)
+
+modnames <- c("mod1", "mod_null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Pronghorn Base Models.xlsx", 
-         #  sheetName="Detection Models", append=T)  
 
 # Top model diagnostics
 
@@ -387,14 +389,15 @@ det.mod <- occu( ~ veg_cover_cam ~ 1, occu.anam)
 # 1-variable occupancy models
 mod1 <- occu( ~ veg_cover_cam ~  slope, occu.anam)
 
-# Combine models in model selection table
-top_mods <- model.sel(det.mod, mod1)
+# Model selection
+cand.models <- list(mod1, det.mod)
+
+modnames <- c("mod1", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Pronghorn Base Models.xlsx", 
-        #   sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics
 
