@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,12 +21,22 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+
 ###########################################################
 # SETUP CODE FOR PRONGHORN OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
 detHist <- read.csv(file = "pronghorn detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -233,11 +239,14 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
   # tree density
   # veg cover
 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 site.covs.cor <- site.covs %>% 
   select(tree_density_5_70, veg_cover_cam)
 
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
-#correlated = 0.87 (use visual obstruction)
+#correlated = 0.87 (use veg cover cam)
 
 # Null model
 mod_null <- occu( ~ 1 ~ 1, occu.anam)

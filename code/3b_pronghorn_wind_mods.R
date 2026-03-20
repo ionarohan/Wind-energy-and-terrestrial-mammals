@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
   #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 23.
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,12 +21,21 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(unmarked)
+library(tidyverse)
+library(MuMIn)
+
 ###########################################################
 # SETUP CODE FOR PRONGHORN OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
 detHist <- read.csv(file = "pronghorn detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -61,6 +66,18 @@ Canopy_Cov_Slope <- occu( ~ veg_cover_cam ~
   #occupancy models separately ranked for the effect of each wind energy 
   #variable on the probability of habitat selection (ψ) of pronghorn is found 
   #in Table S3.14.
+
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
+# site-level variable correlations
+wind.hab.cor <- site.covs %>% 
+  select(biotic_com_2, canopy_cov, slope, 
+         turbine_interior, X150cm_turbine_vis, turbine_dist,
+         turbine_density_3_7km, turbine_rd_dist, turbine_rd_density_3_7km)
+
+cors <- cor(wind.hab.cor, method='spearman')  
+# none correlated above |0.7|
 
 #### Turbine Interior Models ####
 
@@ -642,4 +659,3 @@ final_table <- top_mods_df %>%
 ########################################################
 ######################### END ##########################
 ########################################################
-

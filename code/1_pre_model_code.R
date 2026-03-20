@@ -7,39 +7,34 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-##### NOTE: RUN THIS CODE BEFORE RUNNING ALL SPECIES' #####
-########### BASE MODELS, WIND MODELS, OR PLOTS ############
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
   #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 24
+  #is the homewd directory on line 19.
 
 #Set home working directory
-# e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
+  # e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
 homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
 # Load packages 
-library(dplyr)
-library(lubridate)
-library(AICcmodavg) 
-library(MuMIn)
-library(ggpubr)
-library(unmarked)
-library(lmtest)
-library(xlsx)
-library(ggplot2)
-library(tidyverse)
-library(scales)
-library(patchwork)
-library(cowplot)
+#library(dplyr)
+#library(lubridate)
+#library(AICcmodavg) 
+#library(MuMIn)
+#library(ggpubr)
+#library(unmarked)
+#library(lmtest)
+#library(xlsx)
+#library(ggplot2)
+#library(tidyverse)
+#library(scales)
+#library(patchwork)
+#library(cowplot)
 
 # Input site-level covariates
 site.covs <- read.csv("site_covs.csv", nrows = 102, header=TRUE)
@@ -89,7 +84,7 @@ scale_site_covs <- function(site_covs,
        stats            = stats)
 }
 
-# Skip categorical variables in scaling 
+# Skip categorical variables, site, and camera # in scaling 
 skip_vars <- c("site", "cam_number", "biotic_com_2", "cam_moved", "turbine_interior")
 
 scaled_out <- scale_site_covs(site.covs, skip_covs = skip_vars)
@@ -127,9 +122,8 @@ site.covs.scaled$tree_density_5_70_2 <- site.covs.scaled$tree_density_5_70^2
 
 site.covs.scaled$herbaceous_cov2 <- site.covs.scaled$herbaceous_cov^2
 
-#write site.covs.scaled
+# Write site.covs.scaled
 saveRDS(site.covs.scaled, "site_covs_scaled.RData")
-
 
 # Insert observation-level covariates 
 
@@ -232,7 +226,7 @@ obsCovs = list(max.temp = max.temp[,3:53],
                badger.cam = badger.cam[,2:52]
 )
 
-#write obsCovs
+# Write obsCovs
 saveRDS(obsCovs, "obsCovs.RData")
 
 # Skip categorical observation-level covariates in scaling
@@ -252,17 +246,25 @@ scale_matrix_manual_skip <- function(name, mat) {
 obsCovs.scaled <- mapply(scale_matrix_manual_skip, names(obsCovs), obsCovs, 
                          SIMPLIFY = FALSE)
 
-#write  obsCovs.scaled
+# Write  obsCovs.scaled
 saveRDS(obsCovs.scaled, "obsCovs_scaled.RData")
 
-# Store means and SDs for scaled covariates (exclude categorical ones)
-obsCovs.stats <- lapply(obsCovs[setdiff(names(obsCovs), categorical_covs)], 
-                        function(mat) {
-                          list(mean = mean(unlist(mat), na.rm = TRUE),
-                               sd   = sd(unlist(mat), na.rm = TRUE))
-                        })
+## Check correlations between all wind variables
+wind.cor <- site.covs %>% 
+  select(turbine_interior, X50cm_turbine_vis, X150cm_turbine_vis, turbine_dist,
+         turbine_density_0_9km, turbine_density_1_3km,turbine_density_1_5km,
+         turbine_density_1_6km, turbine_density_1_9km, turbine_density_2_4km,
+         turbine_density_3_7km, turbine_rd_dist, turbine_rd_density_0_1km,
+         turbine_rd_density_0_9km, turbine_rd_density_1_3km,
+         turbine_rd_density_1_5km, turbine_rd_density_1_6km, 
+         turbine_rd_density_1_9km, turbine_rd_density_2_4km,
+         turbine_rd_density_3_7km)
+
+cor_wind <- cor(wind.cor, method='spearman')  
+# turbine interior correlated with turbine density
+# turbine distance correlated with turbine density, access rd dist
+# access rd density correlated with access rd dist 
 
 ########################################################
 ######################### END ##########################
 ########################################################
-

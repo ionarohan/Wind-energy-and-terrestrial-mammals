@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,22 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+
 ###########################################################
 # SETUP CODE FOR KIT FOX OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "kit fox detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "kit fox detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -232,7 +237,7 @@ null.aicc - AICc(jackrabbit.hours,k=2) #worse than null
 vehicle.total <- occu( ~ vehicle.count ~ 1, occu.vuma, starts = c(-1, 0, 0))
 null.aicc - AICc(vehicle.total,k=2) # worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.vuma, starts = c(-1, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.vuma, starts = c(-1, -1, -1))
 null.aicc - AICc(vehicle.hours,k=2) # worse than null
 
 human.hours <- occu( ~ human.active ~ 1, occu.vuma, starts = c(-1, 0, 0)) 
@@ -251,11 +256,12 @@ ndvi.site <- occu( ~ NDVI_1_9km ~ 1, occu.vuma, starts = c(-1, 0, 0))
 null.aicc - AICc(ndvi.site,k=2) #better than null
 confint(ndvi.site, level=0.85, type="det") # 85% CI does not overlap zero 
 
-wood <- occu( ~ woodland_percent_1_9km ~ 1, occu.vuma, starts = c(-1, 0, 0))       
+wood <- occu( ~ woodland_percent_1_9km ~ 1, occu.vuma, starts = c(-1, 0, 0))
 null.aicc - AICc(wood, k=2) #better than null
 confint(wood, level=0.85, type="det") # 85% CI does not overlap zero 
 
-bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.vuma, starts = c(0, -4, -10))        
+bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.vuma, 
+                   starts = c(0, -4, -10))        
 null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="det") # 85% CI overlaps zero 
 
@@ -312,19 +318,24 @@ confint(cam.moved, level=0.85, type="det") # 85% CI does not overlap zero
 
 # Check correlations between detection variables 
 
-# site-level variables 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
 
+# site-level variables 
 site.covs.cor <- site.covs %>% 
   select(NDVI_1_9km, detection_angle)
 
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
 # none correlated above |0.7|
 
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.RData")
+
 #  observation-level variables
-cor_obs <- cor(obsCovs$precip.cat, obsCovs$max.temp)
+cor_obs <- cor(obs.covs $precip.cat, obs.covs$max.temp)
 
 # Run this code to get correlation matrix in Excel 
-#write.csv(cor_obs, file="Correlations kit fox.csv")
+  #write.xlsx(cor_obs, file="Correlations kit fox.xlsx")
 
 # Null model
 vuma.null <- occu( ~ 1 ~ 1, occu.vuma)
@@ -366,7 +377,6 @@ top_mods <- model.sel(
 # Run this code to see candidate detection models 
 #write.xlsx(top_mods, file="Kit Fox Base Models.xlsx", 
        #  sheetName="Detection Models", append=T)  
-
 
 # Top model diagnostics
 
@@ -572,7 +582,7 @@ top_mods <- model.sel(
 # Candidate occupancy models are found in Table S2.6.
 
 # Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Kit Fox Base Models.xlsx", 
+  #write.xlsx(top_mods, file="Kit Fox Base Models.xlsx", 
         #  sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics

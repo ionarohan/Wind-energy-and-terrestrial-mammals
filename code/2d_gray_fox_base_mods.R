@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
   #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 23.
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,22 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+
 ###########################################################
 # SETUP CODE FOR GRAY FOX OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "gray fox detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "gray fox detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -425,7 +430,7 @@ bio.com <- occu(  ~ as.factor(cam_moved)
 occu.null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="state") # 85% CI does not overlap zero
 
-# shrubland and NDVI proceed
+# NDVI proceeds
 
 #### Vegetation Concealment Cover Hypothesis Group  ####
 
@@ -472,15 +477,18 @@ occu.null.aicc - AICc(heat.load) #worse than null
 # OCCUPANCY MODEL SELECTION #
 #################################################
 
-# Variables that proceed (4)
+# Variables that proceed (3)
   # NDVI 1.5 KM
-  # shrub density 
   # slope
   # veg cover
 
 # Check correlations between occupancy variables 
+
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 site.covs.cor <- site.covs %>% 
-  select(veg_cover, slope, shrub_yucca_density, NDVI_1_5km)
+  select(veg_cover, slope, NDVI_1_5km)
 
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
 # none correlated above |0.7|
@@ -490,21 +498,16 @@ det.mod <- occu( ~ as.factor(cam_moved) ~ 1, occu.urci)
 
 # 1-variable occupancy models
 mod1 <- occu( ~ as.factor(cam_moved) ~ slope, occu.urci)
-
-mod3 <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km, occu.urci)
-
-mod4 <- occu( ~ as.factor(cam_moved) ~ veg_cover, occu.urci)
+mod2 <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km, occu.urci)
+mod3 <- occu( ~ as.factor(cam_moved) ~ veg_cover, occu.urci)
 
 # 2-variable occupancy models
-mod6 <- occu( ~ as.factor(cam_moved) ~ slope + NDVI_1_5km, occu.urci)
-
-mod7 <- occu( ~ as.factor(cam_moved) ~ slope + veg_cover, occu.urci)
-
-mod10 <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km + veg_cover, 
-                 occu.urci)
+mod4 <- occu( ~ as.factor(cam_moved) ~ slope + NDVI_1_5km, occu.urci)
+mod5 <- occu( ~ as.factor(cam_moved) ~ slope + veg_cover, occu.urci)
+mod6 <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km + veg_cover, occu.urci)
 
 # Combine models in model selection table
-top_mods <- model.sel(mod1, mod3, mod4, mod6, mod7, mod10, det.mod)
+top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, det.mod)
 
 # Candidate occupancy models are found in Table S2.6.
 
@@ -514,26 +517,26 @@ top_mods <- model.sel(mod1, mod3, mod4, mod6, mod7, mod10, det.mod)
 
 # Top model diagnostics
 
-AICc(det.mod) - AICc(mod6) 
-summary(mod6)
+AICc(det.mod) - AICc(mod4) 
+summary(mod4)
 
 # The parameter estimates, standard errors, and 85% confidence intervals for
   #the best-supported model describing the probability of detection (p) and 
   #habitat selection (ψ) of gray foxes are listed in Table S2.10.
 
 # Calculate the 85% confidence intervals for variables 
-confint(mod6, type = "det", level = 0.85)    
+confint(mod4, type = "det", level = 0.85)    
 #CIs for detection variables do not overlap zero
 
-confint(mod6, type = "state", level = 0.85)  
+confint(mod4, type = "state", level = 0.85)  
 #CIs for occupancy variables do not overlap zero
 
 # Calculate multicollinearity
-unmarked::vif(mod6, type = "state") # all below 2
+unmarked::vif(mod4, type = "state") # all below 2
 
 # Calculate mean daily detection probability with the top model
 
-backTransform(linearComb(mod6,                           
+backTransform(linearComb(mod4,                           
                          coefficients= c(1,0),  
                          type = 'det'))     
 # 0.11 OR 11%%
@@ -541,7 +544,7 @@ backTransform(linearComb(mod6,
 
 # Calculate the occupancy probability
 
-backTransform(linearComb(mod6,                
+backTransform(linearComb(mod4,                
                          coefficients=c(1,0,0),   
                          type = 'state')) 
 #  0.124 OR 12.4%
@@ -560,7 +563,7 @@ backTransform(linearComb(mod6,
 
 # Predict detection probability for survey sites 
 
-pred_det <- predict(mod6,          
+pred_det <- predict(mod4,          
                     type = "det",                 
                     newdata = occu.urci@siteCovs)[c("Predicted",
                                                     "SE",
@@ -575,7 +578,7 @@ pred_det_df <- data.frame(Predicted = pred_det$Predicted,
 
 # Predict occupancy probability for survey sites 
 
-pred_occu <- predict(mod6,          
+pred_occu <- predict(mod4,          
                      type = "state",                 
                      newdata = occu.urci@siteCovs)[c("Predicted",
                                                      "SE",

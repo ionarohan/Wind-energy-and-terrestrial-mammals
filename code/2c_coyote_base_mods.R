@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,22 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+
 ###########################################################
 # SETUP CODE FOR COYOTE OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "coyote detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "coyote detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -255,7 +260,7 @@ null.aicc - AICc(ndvi2, k=2) #better than null
 confint(ndvi2, level=0.85, type="det") 
 # 85% CI does not overlaps zero but is positive (no support for hypothesis)
 
-bio.com2 <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.cala, starts = c(1, 0, 0))        
+bio.com2 <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.cala, starts = c(1, 0, 0))
 null.aicc - AICc(bio.com2, k=2) #worse than null
 
 tree <- occu( ~ tree_density_5_70 ~ 1, occu.cala)
@@ -325,15 +330,18 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 
 # Check correlations between detection variables 
 
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.RData")
+
 obs_cor <- cor(data.frame(
-  cow = as.vector(obsCovs$cow.active),
-  human = as.vector(obsCovs$human.active),
-  lagomorph = as.vector(obsCovs$lagomorph.active)
+  cow = as.vector(obs.covs$cow.active),
+  human = as.vector(obs.covs$human.active),
+  lagomorph = as.vector(obs.covs$lagomorph.active)
 ))
 # none correlated above |0.7|
 
 # Run this code to get correlation matrix in Excel 
-#write.csv(obs_cor, file="Correlations coyote.csv")
+  #write.xlsx(obs_cor, file="Correlations coyote.xlsx")
 
 # Null model
 mod_null <- occu( ~ 1 ~ 1, occu.cala, starts = c(2, -3))
@@ -357,7 +365,7 @@ top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod_null)
 # Candidate detection models are found in Table S2.5.
 
 # Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Coyote Base Models.xlsx", 
+  #write.xlsx(top_mods, file="Coyote Base Models.xlsx", 
           # sheetName="Detection Models", append=T)  
 
 # Top model diagnostics
@@ -590,9 +598,11 @@ det_p_by_site <- det_p_full %>%
     upper85    = mean.p + qnorm(0.925) * mean.SE
   )
 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 #Predict occupancy probability for survey sites 
 
-# same result as this code...
 pred_occu <- predict(hab.mod ,          
                      type = "state",                 
                      newdata = occu.cala@siteCovs)[c("Predicted",

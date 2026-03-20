@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -24,6 +20,12 @@ homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
+
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
 
 ###########################################################
 # SETUP CODE FOR MULE DEER OCCUPANCY MODELS #
@@ -174,7 +176,7 @@ stock.total <- occu( ~ livestock.count ~ 1, occu.odhe, starts = c(2, 0, -3))
 null.aicc - AICc(stock.total,k=2) #better than null 
 confint(stock.total, level=0.85, type="det") #85% CI does not overlap zero
 
-stock.hours <- occu( ~ livestock.active ~ 1, occu.odhe, starts = c(2, 0, -3))     
+stock.hours <- occu( ~ livestock.active ~ 1, occu.odhe, starts = c(2, 0, -3))   
 null.aicc - AICc(stock.hours,k=2) #better than null 
 confint(stock.hours, level=0.85, type="det") #85% CI does not overlap zero
 
@@ -195,7 +197,7 @@ confint(cow.water.dense, level=0.85, type="det") #85% CI overlaps zero
 vehicle.total <- occu( ~ vehicle.count ~ 1, occu.odhe, starts = c(2, 0, -3))
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.odhe, starts = c(-1, 0, 0))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.odhe, starts = c(-1, 0, 0)) 
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
 people.hours <- occu( ~ people.active ~ 1, occu.odhe, starts = c(-1, 0, 0))
@@ -237,7 +239,7 @@ veg.cover.cam <- occu( ~ veg_cover_cam ~ 1, occu.odhe)
 null.aicc - AICc(veg.cover.cam, k=2) #better than null
 confint(veg.cover.cam, level=0.85, type="det") # 85% CI does not overlap zero
 
-detect.angle <- occu( ~ detection_angle ~ 1, occu.odhe, starts = c(-1, -1, 0))    
+detect.angle <- occu( ~ detection_angle ~ 1, occu.odhe, starts = c(-1, -1, 0)) 
 null.aicc - AICc(detect.angle, k=2) #worse than null
 
 max.trig.dist <- occu( ~ max_trig_dist ~ 1, occu.odhe, starts = c(-1, 0, 0))   
@@ -273,8 +275,9 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 # Check correlations between detection variables 
 
 # Read in site-level covariates
-site.covs <- read.csv("site_covs.csv", nrows = 102, header=TRUE)
-# site-level variables 
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
+# site-level variable correlations
 site.covs.cor <- site.covs %>% 
   select(max_trig_dist, NDVI_1_9km)
 
@@ -282,7 +285,8 @@ cor_site_covs <- cor(site.covs.cor, method='spearman')
 # none correlated above |0.7|
 
 # Read in observation-level covariates
-obs.covs <- readRDS("obsCovs.csv")
+obs.covs <- readRDS("obsCovs.RData")
+
 #  observation-level variables
 obs_cor <-cor(data.frame(
   livestock = as.vector(obs.covs$livestock.count),
@@ -292,7 +296,7 @@ obs_cor <-cor(data.frame(
 # none correlated above |0.7|
 
 # Run this code to get correlation matrix in Excel 
-# write.xlsx(cor_obs, file="Correlations mule deer.xlsx") 
+  #write.xlsx(obs_cor, file="Correlations mule deer.xlsx") 
 
 # Null model
 mod_null <- occu( ~ 1 ~ 1, occu.odhe)
@@ -318,13 +322,13 @@ mod14 <- occu( ~ people.active + rain.month ~ 1, occu.odhe)
 mod15 <- occu( ~ livestock.count + rain.month ~ 1, occu.odhe)
 
 # Model selection
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, mod10, 
-                      mod11, mod12, mod13, mod14, mod15, mod_null)
+top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                      mod10, mod11, mod12, mod13, mod14, mod15, mod_null)
 
 # Candidate detection models are found in Table S2.5.
 
 # Run this code to see candidate detection models 
- #write.xlsx(top_mods, file="Mule Deer Base Models.xlsx", 
+  #write.xlsx(top_mods, file="Mule Deer Base Models.xlsx", 
          #  sheetName="Detection Models", append=T)  
 
 # Top model diagnostics
