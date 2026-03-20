@@ -25,6 +25,7 @@ setwd(paste0(homewd, "data/"))
 library(unmarked)
 library(tidyverse)
 library(MuMIn)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR PRONGHORN OCCUPANCY MODELS #
@@ -54,13 +55,15 @@ occu.anam <- unmarkedFrameOccu(y=detHist,
 
 Habitat <- occu( ~ veg_cover_cam ~ slope, occu.anam)
 
-Null <- occu( ~ veg_cover_cam ~ 1, occu.anam)
-
 Bio_Com_Slope <- occu( ~ veg_cover_cam 
-                       ~ as.factor(biotic_com_2) + slope, occu.anam)
+                       ~ as.factor(biotic_com_2) + slope, occu.anam,
+                         starts = c(-2, -5, -1, -3, -1)) 
+                        # large SE for biotic community parameter
 
-Canopy_Cov_Slope <- occu( ~ veg_cover_cam ~ 
+Canopy_Cov_Slope <- occu( ~ veg_cover_cam 
                           ~ canopy_cov + slope, occu.anam)
+
+Null <- occu( ~ veg_cover_cam ~ 1, occu.anam)
 
 ## The table with the comparison of the relative weight of evidence between
   #occupancy models separately ranked for the effect of each wind energy 
@@ -90,7 +93,9 @@ Habitat_Add_Turbine_Int <- occu( ~ veg_cover_cam
 
 Bio_Com_X_Turbine_Int <- occu( ~ veg_cover_cam 
                                ~ slope + as.factor(turbine_interior) *  
-                                 as.factor(biotic_com_2), occu.anam)
+                                 as.factor(biotic_com_2), occu.anam,
+                                 starts = c(-2, -1, -1, -3, -3, -3, -1))
+                  # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -196,11 +201,14 @@ Habitat_Add_Turbine_Vis <- occu( ~ veg_cover_cam
 
 Canopy_Cov_X_Turbine_Vis <- occu( ~ veg_cover_cam 
                                   ~ slope + X150cm_turbine_vis * canopy_cov, 
-                                  occu.anam)
+                                  occu.anam,
+                                  starts = c(1, -1, -1, -3, 3, -5, -1))
 
 Bio_Com_X_Turbine_Vis <- occu( ~ veg_cover_cam 
                                ~ slope + X150cm_turbine_vis * 
-                                 as.factor(biotic_com_2), occu.anam)
+                                 as.factor(biotic_com_2), occu.anam,
+                                 starts = c(-1, -1, 0, -5, 5, -3, -1))
+                      # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -275,7 +283,9 @@ Habitat_Add_Turbine_Dist <- occu( ~ veg_cover_cam
 
 Bio_Com_X_Turbine_Dist <- occu( ~ veg_cover_cam 
                                 ~ slope + as.factor(biotic_com_2) * 
-                                  turbine_dist, occu.anam)
+                                  turbine_dist, occu.anam,
+                                  starts = c(-1, -1, -10, -1, 2, -3, -1))
+                # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -348,7 +358,9 @@ Habitat_Add_Turbine_Dense <- occu( ~ veg_cover_cam
 
 Bio_Com_X_Turbine_Dense <- occu( ~ veg_cover_cam 
                                  ~ slope + as.factor(biotic_com_2) *
-                                   turbine_density_3_7km, occu.anam)
+                                   turbine_density_3_7km, occu.anam,
+                                   starts = c(-1, -1, -10, 0, -3, -3, -1))
+                  # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -421,7 +433,9 @@ Habitat_Add_Turbine_Rd_Dist <- occu( ~ veg_cover_cam
 
 Bio_Com_X_Turbine_Rd_Dist <- occu( ~ veg_cover_cam 
                                    ~ slope + as.factor(biotic_com_2) * 
-                                     turbine_rd_dist, occu.anam)
+                                     turbine_rd_dist, occu.anam,
+                                     starts = c(-1, -1, -10, 3, -3, -3, -1))
+                  # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -495,7 +509,9 @@ Habitat_Add_Turbine_Rd_Dense <- occu( ~ veg_cover_cam
 
 Bio_Com_X_Turbine_Rd_Dense <- occu( ~ veg_cover_cam 
                                     ~ slope + as.factor(biotic_com_2) * 
-                                      turbine_rd_density_3_7km, occu.anam)
+                                      turbine_rd_density_3_7km, occu.anam,
+                                      starts = c(-1, -1, -10, -1, -3, -3, -1))
+                    # large SEs for biotic community parameter and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -564,98 +580,153 @@ stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 # RUN AFTER THE AICc TABLE IS CREATED FOR EACH GROUP OF WIND MODELS #
 #####################################################################
 
-# 1. Function to compute 85% CI for occupancy (psi) or detection
-get_85CI <- function(model, type = "state") {
-  est <- coef(model, type = type)
-  if(length(est) == 0) return(NULL)
-  
-  vc <- vcov(model, type = type)
-  se <- sqrt(diag(vc))
-  z <- qnorm(0.925)  # 85% CI
-  
-  df <- data.frame(
-    Parameter = names(est),
-    CI_string = sprintf("%.2f [%.2f, %.2f]", est, est - z*se, est + z*se)
+# 1. Create AICc selection table
+
+top_mods <- aictab(
+    cand.set = model_list,
+    modnames = names(model_list)
   )
-  return(df)
-}
-
-# 2. Model selection table
-top_mods <- model.sel(model_list)
+  
 top_mods_df <- as.data.frame(top_mods)
-top_mods_df$Model <- rownames(top_mods_df)
-
-# 3. Compute occupancy and detection CIs for all models
+top_mods_df$Model <- as.character(top_mods_df$Modnames)
+  
+  # Extract weights
+  w <- top_mods_df$AICcWt
+  names(w) <- top_mods_df$Model
+  
+# 2. Create CI function
+  
+get_85CI <- function(model, type = "state") {
+    est <- try(coef(model, type = type), silent = TRUE)
+    if(inherits(est, "try-error") || length(est) == 0) return(NULL)
+    
+    vc <- try(vcov(model, type = type), silent = TRUE)
+    if(inherits(vc, "try-error")) return(NULL)
+    
+    se <- sqrt(diag(vc))
+    z <- qnorm(0.925)
+    
+    data.frame(
+      Parameter = names(est),
+      CI_string = sprintf("%.2f [%.2f, %.2f]",
+                          est, est - z*se, est + z*se)
+    )
+  }
+  
+# 3. Compute CIs
 ci_psi_list <- lapply(model_list, get_85CI, type = "state")
 ci_det_list <- lapply(model_list, get_85CI, type = "det")
-
-# Helper to pivot wide and add model name
+  
 pivot_ci_wide <- function(ci_list) {
-  df <- bind_rows(
-    lapply(names(ci_list), function(name) {
-      x <- ci_list[[name]]
-      if(!is.null(x)) x$Model <- name
-      x
+    df <- bind_rows(
+      lapply(names(ci_list), function(name) {
+        x <- ci_list[[name]]
+        if(!is.null(x)) x$Model <- name
+        x
+      })
+    )
+    
+    if(nrow(df) == 0) return(data.frame(Model = character(0)))
+    
+    df %>% pivot_wider(names_from = Parameter, values_from = CI_string)
+  }
+  
+  ci_psi_wide <- pivot_ci_wide(ci_psi_list)
+  ci_det_wide <- pivot_ci_wide(ci_det_list)
+  
+  if(ncol(ci_psi_wide) > 1) {
+    names(ci_psi_wide)[-1] <- paste0(names(ci_psi_wide)[-1], "_psi")
+  }
+  if(ncol(ci_det_wide) > 1) {
+    names(ci_det_wide)[-1] <- paste0(names(ci_det_wide)[-1], "_det")
+  }
+  
+# 4. Calculate LRTs 
+
+llr_df <- NULL
+  
+  if(!is.null(wind_pairs)) {
+    llr_results <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      if(!(mod_with_wind %in% names(model_list)) ||
+         !(mod_without %in% names(model_list))) {
+        return(NULL)
+      }
+      
+      m1 <- model_list[[mod_without]]
+      m2 <- model_list[[mod_with_wind]]
+      
+      ll1 <- logLik(m1)
+      ll2 <- logLik(m2)
+      
+      lrt <- 2 * (ll2 - ll1)
+      
+      k1 <- attr(ll1, "df")
+      k2 <- attr(ll2, "df")
+      
+      if(is.null(k1) | is.null(k2)) {
+        k1 <- length(coef(m1))
+        k2 <- length(coef(m2))
+      }
+      
+      df_diff <- k2 - k1
+      pval <- pchisq(lrt, df = df_diff, lower.tail = FALSE)
+      
+      data.frame(
+        Model = mod_with_wind,
+        LRT_stat = as.numeric(lrt),
+        LRT_df = df_diff,
+        LRT_p = as.numeric(pval)
+      )
     })
-  )
-  if(nrow(df) == 0) return(data.frame(Model = character(0)))
+    
+    llr_df <- bind_rows(llr_results)
+  }
   
-  df %>% pivot_wider(names_from = Parameter, values_from = CI_string)
-}
+# 5. Calculate evidence ratios
 
-ci_psi_wide <- pivot_ci_wide(ci_psi_list)
-ci_det_wide <- pivot_ci_wide(ci_det_list)
-
-# 4. Log-likelihood ratio tests for wind vs non-wind models
-llr_results <- lapply(names(wind_pairs), function(mod_with_wind) {
-  mod_without <- wind_pairs[[mod_with_wind]]
-  m1 <- model_list[[mod_without]]
-  m2 <- model_list[[mod_with_wind]]
+pairwise_ER_df <- NULL
   
-  lrt <- 2 * (logLik(m2) - logLik(m1))
-  df_diff <- attr(logLik(m2), "df") - attr(logLik(m1), "df")
-  pval <- pchisq(lrt, df = df_diff, lower.tail = FALSE)
+  if(!is.null(wind_pairs)) {
+    pairwise_ER <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      ER <- if(all(c(mod_with_wind, mod_without) %in% names(w))) {
+        w[mod_with_wind] / w[mod_without]
+      } else NA
+      
+      data.frame(
+        Model = mod_with_wind,
+        Evidence_Ratio_vs_NonWind = ER
+      )
+    })
+    
+    pairwise_ER_df <- bind_rows(pairwise_ER)
+  }
   
-  data.frame(
-    Model = mod_with_wind,
-    LRT_stat = as.numeric(lrt),
-    LRT_p = as.numeric(pval)
-  )
-})
-llr_df <- bind_rows(llr_results)
-
-# 5. Pairwise evidence ratios
-w <- top_mods_df$weight
-names(w) <- top_mods_df$Model
-pairwise_ER <- lapply(names(wind_pairs), function(mod_with_wind) {
-  mod_without <- wind_pairs[[mod_with_wind]]
-  ER <- if(all(c(mod_with_wind, mod_without) 
-               %in% names(w))) w[mod_with_wind] / w[mod_without] else NA
-  data.frame(Model = mod_with_wind, Evidence_Ratio_vs_NonWind = ER)
-})
-pairwise_ER_df <- bind_rows(pairwise_ER)
-
 # 6. Merge everything
+
 final_table <- top_mods_df %>%
-  left_join(ci_psi_wide, by = "Model") %>%
-  left_join(ci_det_wide, by = "Model", suffix = c("_psi", "_det")) %>%
-  left_join(llr_df, by = "Model") %>%
-  left_join(pairwise_ER_df, by = "Model")
-
+    left_join(ci_psi_wide, by = "Model") %>%
+    left_join(ci_det_wide, by = "Model") %>%
+    left_join(llr_df, by = "Model") %>%
+    left_join(pairwise_ER_df, by = "Model")
+  
 # 7. Export tables to .csv files
-
+  
 #write.csv(final_table, "prong_turbine_interior.csv", row.names = FALSE)
-
+  
 #write.csv(final_table, "prong_turbine_vis.csv", row.names = FALSE)
-
+  
 #write.csv(final_table, "prong_turbine_dist.csv", row.names = FALSE)
-
+  
 #write.csv(final_table, "prong_turbine_density.csv", row.names = FALSE)
-
+  
 #write.csv(final_table, "prong_turbine_rd_dist.csv", row.names = FALSE)
-
+  
 #write.csv(final_table, "prong_turbine_rd_density.csv", row.names = FALSE)
-
+  
 ########################################################
 ######################### END ##########################
 ########################################################
