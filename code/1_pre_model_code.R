@@ -122,8 +122,8 @@ site.covs.scaled$tree_density_5_70_2 <- site.covs.scaled$tree_density_5_70^2
 
 site.covs.scaled$herbaceous_cov2 <- site.covs.scaled$herbaceous_cov^2
 
-# Write site.covs.scaled
-saveRDS(site.covs.scaled, "site_covs_scaled.RData")
+# Run this code to write site.covs.scaled to RData
+# saveRDS(site.covs.scaled, "site_covs_scaled.RData")
 
 # Insert observation-level covariates 
 
@@ -226,8 +226,8 @@ obsCovs = list(max.temp = max.temp[,3:53],
                badger.cam = badger.cam[,2:52]
 )
 
-# Write obsCovs
-saveRDS(obsCovs, "obsCovs.RData")
+# Run this code to write obsCovs to RData
+# saveRDS(obsCovs, "obsCovs.RData")
 
 # Skip categorical observation-level covariates in scaling
 categorical_covs <- c(
@@ -246,8 +246,8 @@ scale_matrix_manual_skip <- function(name, mat) {
 obsCovs.scaled <- mapply(scale_matrix_manual_skip, names(obsCovs), obsCovs, 
                          SIMPLIFY = FALSE)
 
-# Write  obsCovs.scaled
-saveRDS(obsCovs.scaled, "obsCovs_scaled.RData")
+# Run this code to write obsCovs.scaled to RData
+# saveRDS(obsCovs.scaled, "obsCovs_scaled.RData")
 
 ## Check correlations between all wind variables
 wind.cor <- site.covs %>% 
