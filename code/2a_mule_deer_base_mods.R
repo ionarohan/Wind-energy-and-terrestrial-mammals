@@ -530,10 +530,6 @@ mod10 <- occu( ~ max_trig_dist + livestock.count
                ~ shrub_yucca_density + veg_cover, occu.odhe,
                starts = c(0, -2, -5, -2, -1, -2))
 
-# Combine models in model selection table
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9,
-                      mod10, det.mod)
-
 # Model selection
 cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
                     mod10, det.mod)
