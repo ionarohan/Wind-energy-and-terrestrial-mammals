@@ -9,16 +9,11 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-  #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 25.
+  #should need to change for the script to run (assuming packages are installed)   #is the homewd directory on line 20.
 
 #Set home working directory
   # e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -26,6 +21,14 @@ homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
+
+# Load packages 
+library(unmarked)
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(patchwork)
+library(cowplot)
 
 ########################################################
 ################# MULE DEER PLOTS ######################
@@ -35,6 +38,10 @@ setwd(paste0(homewd, "data/"))
 
 # Read in edited .csv
 detHist <- read.csv(file = "mule deer detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist <- detHist %>%
@@ -45,19 +52,22 @@ occu.odhe <- unmarkedFrameOccu(y=detHist,
                                siteCovs = site.covs.scaled, 
                                obsCovs = obsCovs.scaled)
 
+# Read in unscaled site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 #### Turbine visibility * biotic community + shrub density model plot ####
 
-Bio_Com_X_Turbine_Vis <- occu( ~ max_trig_dist + NDVI_1_9km ~ 
+Bio_Com_X_Turbine_Vis <- occu( ~ max_trig_dist + livestock.count ~ 
                                  as.factor(biotic_com_2) * 
                                  X150cm_turbine_vis + shrub_yucca_density, 
-                                 occu.odhe)
+                                 occu.odhe, starts = c(0,5,0,2,5,-3,0,-2))
 
 # Convert biotic_com_2 to factor
 occu.odhe@siteCovs$biotic_com_2 <- as.factor(occu.odhe@siteCovs$biotic_com_2)
 biotic_levels <- levels(occu.odhe@siteCovs$biotic_com_2)
 
 # Fit model using scaled X150cm_turbine_vis
-mod1 <- occu( ~ max_trig_dist + NDVI_1_9km ~ shrub_yucca_density +
+mod1 <- occu( ~ max_trig_dist + livestock.count ~ shrub_yucca_density +
                 as.factor(biotic_com_2) * X150cm_turbine_vis, occu.odhe)
 
 # Get mean and SD of X150cm_turbine_vis
@@ -77,8 +87,6 @@ plot_data <- expand.grid(
   X150cm_turbine_vis = turbine_seq_scaled,
   biotic_com_2 = factor(biotic_levels, levels = c("1", "2"), 
                         labels = c("Grassland", "Woodland")),
-  NDVI_1_9km = 0,
-  max_trig_dist = 0,
   shrub_yucca_density = 0
 )
 
@@ -95,13 +103,10 @@ deer_df_vis <- plot_data
 
 # Create site_data for observed points
 site_data <- site.covs %>%
-  dplyr::select(X150cm_turbine_vis, biotic_com_2, NDVI_1_9km, 
-                max_trig_dist, shrub_yucca_density) %>%
+  dplyr::select(X150cm_turbine_vis, biotic_com_2, shrub_yucca_density) %>%
   mutate(
     X150cm_turbine_vis_scaled = 
       (X150cm_turbine_vis - wind_mean) / wind_sd,
-    NDVI_1_9km = 0,
-    max_trig_dist = 0,
     shrub_yucca_density = 0
   )
 
@@ -114,8 +119,6 @@ site_data$biotic_com_2 <- factor(as.character(site_data$biotic_com_2),
 site_preds <- predict(mod1, type = "state", newdata = data.frame(
   X150cm_turbine_vis = site_data$X150cm_turbine_vis_scaled,
   biotic_com_2 = site_data$biotic_com_2,
-  NDVI_1_9km = site_data$NDVI_1_9km,
-  max_trig_dist = site_data$max_trig_dist,
   shrub_yucca_density = site_data$shrub_yucca_density
 ))
 
@@ -177,10 +180,10 @@ deer.vis <- ggplot(plot_data,
 
 deer.vis
 
-#### Turbine distance + visual obstruction model plot ####
+#### Turbine distance + veg cover model plot ####
 
 # Fit model using scaled wind variable
-mod1 <- occu(~ max_trig_dist + NDVI_1_9km ~  
+mod1 <- occu(~ max_trig_dist + livestock.count ~  
                veg_cover + turbine_dist, occu.odhe)
 
 # Get mean and SD of wind variable
@@ -198,8 +201,6 @@ turbine_seq_scaled <- (turbine_seq_unscaled - wind_mean) / wind_sd
 # Create plot prediction dataset 
 plot_data <- data.frame(
   turbine_dist = turbine_seq_scaled,
-  NDVI_1_9km = 0,
-  max_trig_dist = 0,
   veg_cover = 0,
   turbine_dist_unscaled = turbine_seq_unscaled
 )
@@ -212,20 +213,15 @@ plot_data$upper <- preds$upper
 
 # Create site_data for observed points
 site_data <- site.covs %>%
-  dplyr::select(turbine_dist, NDVI_1_9km, max_trig_dist,
-                veg_cover) %>%
+  dplyr::select(turbine_dist, veg_cover) %>%
   mutate(turbine_dist_scaled = 
            (turbine_dist - wind_mean) / wind_sd,
-         NDVI_1_9km = 0,
-         max_trig_dist = 0,
          veg_cover = 0
   )
 
 # Predict for observed sites
 site_preds <- predict(mod1, type = "state", newdata = data.frame(
   turbine_dist = site_data$turbine_dist_scaled,
-  NDVI_1_9km = site_data$NDVI_1_9km,
-  max_trig_dist = site_data$max_trig_dist,
   veg_cover = site_data$veg_cover
 ))
 
@@ -292,7 +288,7 @@ occu.cala <- unmarkedFrameOccu(y=detHist,
 
 
 # Fit model using scaled wind variable
-mod1 <- occu( ~ human.active + cow.active ~ 
+mod1 <- occu( ~ people.active + cottontail.active ~ 
                 X50cm_turbine_vis, occu.cala)
 
 confint(mod1, type = "state", level = 0.85) 
@@ -1378,7 +1374,8 @@ final_figure <- plot_grid(
 final_figure
 
 # Save layout to .png
-#ggsave("turbine.plots.png", final_figure, width = 10, height = 14, dpi = 300)
+ggsave(paste0(homewd, "figures/turbine.plots.png"), final_figure, width = 10,
+       height = 14, dpi = 300)
 
 # ================================
 # COMBINE LAST 2 PLOTS
@@ -1437,7 +1434,10 @@ final_figure_2 <- plot_grid(
 final_figure_2
 
 # Save layout to .png
-#ggsave("road.plots.png", final_figure_2, width = 12, height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/road.plots.png"), final_figure_2, width = 12,
+       height = 12, dpi = 300)
+
+# Note that the two figures were combined in PowerPoint to produce Figure 2 in the manuscript
 
 ########################################################
 ######################### END ##########################

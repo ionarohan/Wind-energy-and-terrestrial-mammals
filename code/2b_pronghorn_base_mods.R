@@ -111,8 +111,8 @@ null.aicc - AICc(rain.week, k=2) #worse than null
 
 # Water source and long-term precipitation interaction
 
-precip.water.dense <-  occu( ~ water_tank_density_3_7_km * 
-                               days.since.rain ~ 1, occu.anam)   
+precip.water.dense <- occu( ~ water_tank_density_3_7_km * 
+                              days.since.rain ~ 1, occu.anam)   
 null.aicc - AICc(precip.water.dense, k=2) #worse than null 
 
 #none proceed
@@ -150,10 +150,12 @@ null.aicc - AICc(coy.hours,k=2) #better than null
 confint(coy.hours, level=0.85, type="det") 
 # 85% CI does not overlap zero but is positive (no support for hypothesis)
 
-bob.hours <- occu( ~ bobcat.active ~ 1, occu.anam, starts = c(-1, 0, 0))
+bob.hours <- occu( ~ bobcat.active ~ 1, occu.anam, starts = c(-2, -3, -5))
+                    # NA SEs for detection parameters 
 null.aicc - AICc(bob.hours,k=2) #worse than null 
 
-bob.total <- occu( ~ bobcat.count ~ 1, occu.anam, starts = c(-1, 0, 0))
+bob.total <- occu( ~ bobcat.count ~ 1, occu.anam, starts = c(-1, -3, -3))
+                    # large SE for bobcat count
 null.aicc - AICc(bob.total,k=2) #worse than null 
 
 coy.bob.hours <- occu( ~ coy.bob.active ~ 1, occu.anam, starts = c(-1, 0, 0))
@@ -168,17 +170,21 @@ null.aicc - AICc(coy.bob.total,k=2) #worse than null
 
 ##### Human Activity Hypothesis Group#####
 
-vehicle.total <- occu( ~ vehicle.count ~ 1, occu.anam, starts = c(-1, 0, 0))
+vehicle.total <- occu( ~ vehicle.count ~ 1, occu.anam, starts = c(-2, -3, -5))
+                    # large SE for vehicle count
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.anam, starts = c(-1, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.anam, starts = c(-2, -3, -2))
+                    # large SE for vehicle hours
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
-people.hours <- occu( ~ people.active ~ 1, occu.anam, starts = c(-1, 0, 0))
+people.hours <- occu( ~ people.active ~ 1, occu.anam, starts = c(-2, -3, -3))
+                      # large SE for people hours
 null.aicc - AICc(people.hours,k=2) #better than null
 confint(people.hours, level=0.85, type="det") # 85% CI overlaps zero
 
-human.hours <- occu( ~ human.active ~ 1, occu.anam, starts = c(-1, 0, 0)) 
+human.hours <- occu( ~ human.active ~ 1, occu.anam, starts = c(-2, -4, -5))
+                        # large SE for human hours
 null.aicc - AICc(human.hours,k=2) #better than null
 confint(human.hours, level=0.85, type="det") # 85% CI overlaps zero
 
@@ -192,7 +198,9 @@ null.aicc - AICc(wood, k=2)  #worse than null
 ndvi <- occu( ~ NDVI_3_7km ~ 1, occu.anam)          
 null.aicc - AICc(ndvi, k=2)  #worse than null
 
-bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.anam, starts = c(0, 1, 0))        
+bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.anam, 
+                 starts = c(-1, -3, -5), control = list(maxit = 900000))
+                # large SE for biotic comm
 null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="det") # 85% CI overlaps zero
 
@@ -317,8 +325,8 @@ occu.null.aicc - AICc(coyote, k=2) #worse than null
 
 #### Biotic Community Type Hypothesis Group ####
 
-woodland <- occu( ~ veg_cover_cam ~ tree_density_5_70, occu.anam)
-occu.null.aicc - AICc(woodland) #worse than null 
+trees <- occu( ~ veg_cover_cam ~ tree_density_5_70, occu.anam)
+occu.null.aicc - AICc(trees) #worse than null 
 
 shrubland <- occu( ~ veg_cover_cam ~ shrub_yucca_density, occu.anam)
 occu.null.aicc - AICc(shrubland) #worse than null 
@@ -333,7 +341,8 @@ ndvi <- occu(  ~ veg_cover_cam ~ NDVI_3_7km, occu.anam)
 occu.null.aicc - AICc(ndvi, k=2)  #worse than null
 
 bio.com <- occu( ~ veg_cover_cam
-                 ~ as.factor(biotic_com_2), occu.anam)          
+                 ~ as.factor(biotic_com_2), occu.anam, 
+                   starts = c(-1, -5, -3, 0))   # large SE for biotic comm       
 occu.null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, type = "state", level = 0.85) #85% CI overlaps zero
 

@@ -25,6 +25,7 @@ setwd(paste0(homewd, "data/"))
 library(unmarked)
 library(tidyverse)
 library(MuMIn)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR KIT FOX OCCUPANCY MODELS #
@@ -46,6 +47,153 @@ occu.vuma <- unmarkedFrameOccu(y=detHist,
                                siteCovs = site.covs.scaled, 
                                obsCovs = obsCovs.scaled)
 
+#####################################################################
+# CREATE FUNCTION FOR MODEL SELECTION TABLES #
+#####################################################################
+
+occu_model_selection <- function(model_list, wind_pairs = NULL, 
+                                 file_name = NULL) {
+  
+  # 1. Create AICc selection table
+  
+  top_mods <- aictab(
+    cand.set = model_list,
+    modnames = names(model_list)
+  )
+  
+  top_mods_df <- as.data.frame(top_mods)
+  top_mods_df$Model <- as.character(top_mods_df$Modnames)
+  
+  # Extract weights
+  w <- top_mods_df$AICcWt
+  names(w) <- top_mods_df$Model
+  
+  # 2. Create CI function
+  
+  get_85CI <- function(model, type = "state") {
+    est <- try(coef(model, type = type), silent = TRUE)
+    if(inherits(est, "try-error") || length(est) == 0) return(NULL)
+    
+    vc <- try(vcov(model, type = type), silent = TRUE)
+    if(inherits(vc, "try-error")) return(NULL)
+    
+    se <- sqrt(diag(vc))
+    z <- qnorm(0.925)
+    
+    data.frame(
+      Parameter = names(est),
+      CI_string = sprintf("%.2f [%.2f, %.2f]",
+                          est, est - z*se, est + z*se)
+    )
+  }
+  
+  # 3. Compute CIs
+  ci_psi_list <- lapply(model_list, get_85CI, type = "state")
+  ci_det_list <- lapply(model_list, get_85CI, type = "det")
+  
+  pivot_ci_wide <- function(ci_list) {
+    df <- bind_rows(
+      lapply(names(ci_list), function(name) {
+        x <- ci_list[[name]]
+        if(!is.null(x)) x$Model <- name
+        x
+      })
+    )
+    
+    if(nrow(df) == 0) return(data.frame(Model = character(0)))
+    
+    df %>% pivot_wider(names_from = Parameter, values_from = CI_string)
+  }
+  
+  ci_psi_wide <- pivot_ci_wide(ci_psi_list)
+  ci_det_wide <- pivot_ci_wide(ci_det_list)
+  
+  if(ncol(ci_psi_wide) > 1) {
+    names(ci_psi_wide)[-1] <- paste0(names(ci_psi_wide)[-1], "_psi")
+  }
+  if(ncol(ci_det_wide) > 1) {
+    names(ci_det_wide)[-1] <- paste0(names(ci_det_wide)[-1], "_det")
+  }
+  
+  # 4. Calculate LRTs 
+  
+  llr_df <- NULL
+  
+  if(!is.null(wind_pairs)) {
+    llr_results <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      if(!(mod_with_wind %in% names(model_list)) ||
+         !(mod_without %in% names(model_list))) {
+        return(NULL)
+      }
+      
+      m1 <- model_list[[mod_without]]
+      m2 <- model_list[[mod_with_wind]]
+      
+      ll1 <- logLik(m1)
+      ll2 <- logLik(m2)
+      
+      lrt <- 2 * (ll2 - ll1)
+      
+      k1 <- attr(ll1, "df")
+      k2 <- attr(ll2, "df")
+      
+      if(is.null(k1) | is.null(k2)) {
+        k1 <- length(coef(m1))
+        k2 <- length(coef(m2))
+      }
+      
+      df_diff <- k2 - k1
+      pval <- pchisq(lrt, df = df_diff, lower.tail = FALSE)
+      
+      data.frame(
+        Model = mod_with_wind,
+        LRT_stat = as.numeric(lrt),
+        LRT_df = df_diff,
+        LRT_p = as.numeric(pval)
+      )
+    })
+    
+    llr_df <- bind_rows(llr_results)
+  }
+  
+  # 5. Calculate evidence ratios
+  
+  pairwise_ER_df <- NULL
+  
+  if(!is.null(wind_pairs)) {
+    pairwise_ER <- lapply(names(wind_pairs), function(mod_with_wind) {
+      mod_without <- wind_pairs[[mod_with_wind]]
+      
+      ER <- if(all(c(mod_with_wind, mod_without) %in% names(w))) {
+        w[mod_with_wind] / w[mod_without]
+      } else NA
+      
+      data.frame(
+        Model = mod_with_wind,
+        Evidence_Ratio_vs_NonWind = ER
+      )
+    })
+    
+    pairwise_ER_df <- bind_rows(pairwise_ER)
+  }
+  
+  # 6. Merge everything
+  
+  final_table <- top_mods_df %>%
+    left_join(ci_psi_wide, by = "Model") %>%
+    left_join(ci_det_wide, by = "Model") %>%
+    left_join(llr_df, by = "Model") %>%
+    left_join(pairwise_ER_df, by = "Model")
+  
+  # 7. Write CSV 
+  if(!is.null(file_name)) {
+    write.csv(final_table, file_name, row.names = FALSE)
+  }
+  
+}
+
 #################################################
 # CREATE THE WIND MODELS #
 #################################################
@@ -64,15 +212,21 @@ Coy_Occu <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
                   ~ coy_count_avg, occu.vuma)
 
 Bio_Com_Occu <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
-                      ~ as.factor(biotic_com_2), occu.vuma)
+                      ~ as.factor(biotic_com_2), occu.vuma,
+                        starts = c(0, -5, -5, -2, -2))
+#large SE for biotic comm
 
 Bio_Com_Habitat <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
                          ~ as.factor(biotic_com_2) + coy_count_avg + 
-                           jackrabbit_count_avg, occu.vuma)
+                           jackrabbit_count_avg, occu.vuma,
+                           starts = c(-1, -5, -5, 5, -5, -1, -2))
+#large SE for biotic comm
 
 Canopy_Habitat <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
                         ~ canopy_cov + coy_count_avg + 
-                          jackrabbit_count_avg, occu.vuma)
+                          jackrabbit_count_avg, occu.vuma,
+                          starts = c(-5, -5, -5, 5, -5, -2, -2))
+#large SE for canopy cov and intercept
 
 ## The table with the comparison of the relative weight of evidence between
   #occupancy models separately ranked for the effect of each wind energy 
@@ -116,7 +270,8 @@ Bio_Com_X_Turbine_Int <- occu( ~ as.factor(cam_moved)
                                ~ as.factor(turbine_interior) *
                                  as.factor(biotic_com_2) + 
                                  jackrabbit_count_avg + coy_count_avg, occu.vuma,
-                                 starts = c(0, 1, 0, 0.5, -1, 1, -1, -6))
+                                 starts = c(-1, 0, -5, 2, -1, 2, -2, -1))
+#large SE for biotic comm and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -219,9 +374,12 @@ wind_pairs <- list(
     "Biotic community +jackrabbit count + coyote count" 
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_interior.csv")
+)
 
 #### Turbine Visibility Models ####
 
@@ -243,12 +401,14 @@ Coy_Add_Turbine_Vis <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
 Bio_Com_X_Turbine_Vis <- occu( ~ as.factor(cam_moved) 
                                ~ X50cm_turbine_vis * as.factor(biotic_com_2) + 
                                  jackrabbit_count_avg + coy_count_avg, occu.vuma,
-                                 starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                 starts = c(-2, 0, -5, 2, -1, 5, -2, -1))
+#large SE for biotic comm and interaction
 
 Canopy_X_Turbine_Vis <- occu( ~ as.factor(cam_moved) 
                               ~ canopy_cov * X50cm_turbine_vis + 
                                 jackrabbit_count_avg + coy_count_avg, occu.vuma,
-                                starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                starts = c(-5, -5, 5, 1, -2, 5, -2, -1))
+#large SE for occupancy parameters 
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -321,9 +481,12 @@ wind_pairs <- list(
     "Canopy cover + jackrabbit count + coyote count"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_vis.csv")
+)
 
 #### Turbine Distance Models ####
 
@@ -345,7 +508,8 @@ Bio_Com_X_Turbine_Dist <- occu( ~ as.factor(cam_moved)
                                 ~ turbine_dist * as.factor(biotic_com_2) +
                                   jackrabbit_count_avg + coy_count_avg, 
                                   occu.vuma,
-                                  starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                  starts = c(-1, 0, -10, 2, -1, 2, -2, -1))
+#large SE for biotic comm and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -413,9 +577,12 @@ wind_pairs <- list(
     "Biotic community + jackrabbit count + coyote count"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_dist.csv")
+)
 
 #### Turbine Density Models ####
 
@@ -440,7 +607,8 @@ Bio_Com_X_Turbine_Dense <- occu( ~ as.factor(cam_moved)
                                    as.factor(biotic_com_2) + 
                                    jackrabbit_count_avg + coy_count_avg, 
                                    occu.vuma,
-                                   starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                   starts = c(-1, 0, -10, 2, -1, -2, -2, -1))
+#large SE for biotic comm and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -507,9 +675,13 @@ wind_pairs <- list(
     "Biotic community + jackrabbit count + coyote count"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_density.csv")
+)
 
 #### Access Road Distance Models ####
 
@@ -519,7 +691,7 @@ Turbine_Rd_Dist_Occu <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
 Habitat_Add_Turbine_Rd_Dist <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
                                      ~ turbine_rd_dist + jackrabbit_count_avg +
                                        coy_count_avg, occu.vuma,
-                                       starts = c(0, -2, -3, 0, -1, 1, -5))
+                                       starts = c(0, -1, 5, -5, -5, -1, -2))
 
 Jack_Add_Turbine_Rd_Dist <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
                                   ~ turbine_rd_dist + jackrabbit_count_avg, 
@@ -532,7 +704,8 @@ Bio_Com_X_Turbine_Rd_Dist <- occu( ~ as.factor(cam_moved)
                                    ~ turbine_rd_dist * as.factor(biotic_com_2) +
                                      jackrabbit_count_avg + coy_count_avg, 
                                      occu.vuma,
-                                     starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                     starts = c(-1, 0, -10, 2, -1, 1, -2, -1))
+#large SE for biotic comm and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -600,9 +773,13 @@ wind_pairs <- list(
     "Biotic community + jackrabbit count + coyote count"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
+
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_rd_dist.csv")
+)
 
 #### Access Road Density Models ####
 
@@ -627,7 +804,8 @@ Bio_Com_X_Turbine_Rd_Dense <- occu( ~ as.factor(cam_moved)
                                       as.factor(biotic_com_2) +
                                       jackrabbit_count_avg + coy_count_avg, 
                                       occu.vuma,
-                                      starts = c(0, 1, 0, 1, 0.5, 0.5, 0, 1))
+                                      starts = c(-1, 0, -10, 2, -2, -5, -2, -1))
+#large SE for biotic comm and interaction
 
 # 85% CI for bio community interaction 
 # Extract coefficients and VCOV matrix
@@ -695,13 +873,14 @@ wind_pairs <- list(
     "Biotic community + jackrabbit count + coyote count"
 )
 
-# Ensure model_list matches wind_pairs
-stopifnot(all(names(wind_pairs) %in% names(model_list)))
-stopifnot(all(unlist(wind_pairs) %in% names(model_list)))
 
-#####################################################################
-# CREATE MODEL SELECTION TABLES #
-# RUN AFTER THE AICc TABLE IS CREATED FOR EACH GROUP OF WIND MODELS #
+# Compile final table and export to .csv
+final_table <- occu_model_selection(
+  model_list = model_list,
+  wind_pairs = wind_pairs,
+  file_name = paste0(homewd, "outputs/kit_fox_turbine_rd_density.csv")
+)
+
 #####################################################################
 
 # 1. Function to compute 85% CI for occupancy (psi) or detection

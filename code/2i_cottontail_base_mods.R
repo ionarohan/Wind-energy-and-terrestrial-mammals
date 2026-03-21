@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
 #should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+#is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,23 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+library(AICcmodavg)
+
 ###########################################################
 # SETUP CODE FOR DESERT COTTONTAIL OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "cottontail_detection_hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "cottontail_detection_hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -69,9 +75,8 @@ backTransform(syau.null['state'])
 
 ##### Water Hypothesis Group ####
 
-test.water.dist.tank <- occu( ~ dist_water_tank ~ 1, occu.syau, 
-                                starts = c(-1, 0, 0))      
-null.aicc - AICc(test.water.dist.tank, k=2) #worse than null 
+water.dist.tank <- occu( ~ dist_water_tank ~ 1, occu.syau, starts = c(-1, 0, 0))
+null.aicc - AICc(water.dist.tank, k=2) #worse than null 
 
 # none proceed 
 
@@ -205,13 +210,13 @@ null.aicc - AICc(stock.water.dist,k=2) #worse than null
 
 ##### Biotic Community Type Hypothesis Group ####
 
-ndvi.site <- occu( ~ NDVI_0_1km ~1 , occu.syau)          
-null.aicc - AICc(ndvi.site,k=2) #worse than null
+ndvi <- occu( ~ NDVI_0_1km ~1 , occu.syau)          
+null.aicc - AICc(ndvi, k=2) #worse than null
 
 wood <- occu( ~ woodland_percent_0_1km ~ 1, occu.syau)          
 null.aicc - AICc(wood, k=2) #worse than null
 
-bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.syau, starts = c(0, -3, 1))        
+bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.syau, starts = c(0, -3, 1))
 null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="det") # 85% CI does not overlap zero
 
@@ -262,22 +267,29 @@ confint(cam.moved, level=0.85, type="det")
   # biotic community 
   # cow count
 
-# site-level correlations
+# Check correlations between detection variables 
+
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
+# site-level variable correlations
 site.covs.cor <- site.covs %>%
   select(veg_cover_cam_under_1m, canopy_cov, biotic_com_2)
 
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
 
-#  observation-level variables
-obs_cor <- list(max.temp = (max.temp[,3:53]),
-                cow.count = (cow.count[,3:53])
-) # none correlated above |0.7|
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.RData")
 
-obs_cor_frame <- as.data.frame(na.omit(obs_cor))
-cor_obs <- cor(obs_cor_frame, method='spearman')
+#  observation-level variables
+obs_cor <-cor(data.frame(
+  temp = as.vector(obs.covs$max.temp),
+  cow = as.vector(obs.covs$cow.count)
+))
+# none correlated above |0.7|
 
 # Run this code to get correlation matrix in Excel 
-# write.xlsx(cor_obs, file="Correlations cottontail.xlsx") 
+  # write.xlsx(obs_cor, file="Correlations cottontail.xlsx") 
 
 #Null model
 syau.null <- occu( ~ 1 ~ 1, occu.syau)
@@ -297,13 +309,15 @@ mod7 <- occu( ~ cow.count + as.factor(biotic_com_2)
               ~ 1, occu.syau)
 
 # Model selection
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, syau.null)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, syau.null)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", 
+              "syau.null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Cottontail Base Models.xlsx", 
-         #  sheetName="Detection Models", append=T)  
 
 # Top model diagnostics 
 AICc(syau.null) - AICc(mod6)
@@ -338,16 +352,15 @@ occu.null.aicc <- AICc(mod6)
 
 ####Water Hypothesis Group####
 
-test.water.dist.tank <- occu(  ~ veg_cover_cam_under_1m + 
-                                 as.factor(biotic_com_2) ~ dist_water_tank, 
-                                 occu.syau)      
-occu.null.aicc - AICc(test.water.dist.tank, k=2) #worse than null 
+water.dist.tank <- occu(  ~ veg_cover_cam_under_1m + as.factor(biotic_com_2) 
+                          ~ dist_water_tank, occu.syau)      
+occu.null.aicc - AICc(water.dist.tank, k=2) #worse than null 
 
 #none proceed
 
 #### Predator Activity Hypothesis Group####
 
-bobcat.coyote <- occu( ~ veg_cover_cam_under_1m + as.factor(biotic_com_2)             
+bobcat.coyote <- occu( ~ veg_cover_cam_under_1m + as.factor(biotic_com_2)     
                        ~ pred_count_avg, occu.syau)
 occu.null.aicc - AICc(bobcat.coyote, k=2) #worse than null 
 
@@ -405,7 +418,7 @@ vert.cover <- occu( ~ veg_cover_cam_under_1m + as.factor(biotic_com_2)
 occu.null.aicc - AICc(vert.cover) #worse than null 
 
 veg.cover.diff <- occu( ~ veg_cover_cam_under_1m + as.factor(biotic_com_2)      
-                 ~ veg_cover_diff, occu.syau)
+                        ~ veg_cover_diff, occu.syau)
 occu.null.aicc - AICc(veg.cover.diff) #worse than null 
 
 # none proceed 
@@ -455,14 +468,15 @@ det.mod <- occu( ~ veg_cover_cam_under_1m + as.factor(biotic_com_2)
 mod1 <- occu( ~  veg_cover_cam_under_1m + as.factor(biotic_com_2)        
               ~  NDVI_0_1km, occu.syau)
 
-# Combine models in model selection table
-top_mods <- model.sel(det.mod, mod1)
+# Model selection
+cand.models <- list(mod1, det.mod)
+
+modnames <- c("mod1", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Cottontail Base Models.xlsx", 
-          # sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics
 

@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
 #should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+#is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,23 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+library(AICcmodavg)
+
 ###########################################################
 # SETUP CODE FOR STRIPED SKUNK OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "skunk detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "skunk detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -69,10 +75,10 @@ backTransform(meme.null['state'])
 
 ##### Water Hypothesis Group ####
 
-water.tank <- occu( ~ water_tank_density_1_3km 
+water.tank.dense <- occu( ~ water_tank_density_1_3km 
                     ~ 1, occu.meme, starts = c(-1, 0, 0))       
-null.aicc - AICc(water.tank) #better than null
-confint(water.tank, level=0.85, type="det")  #85% CI does not overlap zero
+null.aicc - AICc(water.tank.dense) #better than null
+confint(water.tank.dense, level=0.85, type="det")  #85% CI does not overlap zero
 
 water.dist.tank <- occu( ~ dist_water_tank 
                          ~ 1, occu.meme, starts = c(-1, 0, 0))  
@@ -93,7 +99,7 @@ null.aicc - AICc(precip.cm) # worse than null
 
 # Long-term precipitation
 
-days.since.rain<- occu( ~ days.since.rain ~ 1 , occu.meme)    
+days.since.rain <- occu( ~ days.since.rain ~ 1 , occu.meme)    
 null.aicc - AICc(days.since.rain, k=2) # worse than null 
 
 rain.month <- occu( ~ rain.month ~ 1, occu.meme)    
@@ -154,10 +160,12 @@ null.aicc - AICc(wind, k=2) #worse than null
 
 ##### Human Activity Hypothesis Group#####
 
-vehicle.total <- occu( ~ vehicle.count ~ 1, occu.meme, starts = c(-1, 0, 0))
+vehicle.total <- occu( ~ vehicle.count ~ 1, occu.meme, starts = c(-2, -2, -5))
+#large SE for vehicle count
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.meme, starts = c(-1, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.meme, starts = c(-2, -2, -1))
+#large SE for vehicle hours
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
 people.hours <- occu( ~ people.active ~ 1, occu.meme, starts = c(-1, 0, 0))
@@ -170,17 +178,17 @@ null.aicc - AICc(human.hours,k=2) #worse than null
 
 ##### Biotic Community Type Hypothesis Group ####
 
-ndvi.site <- occu( ~ NDVI_1_3km ~ 1, occu.meme, starts = c(-1, 0, 0))          
-null.aicc - AICc(ndvi.site,k=2) #worse than null 
+ndvi <- occu( ~ NDVI_1_3km ~ 1, occu.meme, starts = c(-1, 0, 0))          
+null.aicc - AICc(ndvi, k=2) #worse than null 
 
 wood <- occu( ~ woodland_percent_1_3km ~ 1, occu.meme)          
 null.aicc - AICc(wood, k=2) #better than null
 confint(wood, level=0.85, type="det") #85% CI does not overlap zero
 
-bio.com2 <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.meme, 
+bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.meme, 
                  starts = c(-2, -2, -1))        
-null.aicc - AICc(bio.com2, k=2)  #better than null
-confint(bio.com2, level=0.85, type="det") #85% CI does not overlap zero
+null.aicc - AICc(bio.com, k=2)  #better than null
+confint(bio.com, level=0.85, type="det") #85% CI does not overlap zero
 
 tree <- occu( ~  tree_density_5_70 ~ 1, occu.meme)
 null.aicc - AICc(tree)  #better than null
@@ -232,6 +240,9 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 
 ##### check correlations between top variables ####
 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 site.covs.cor <- site.covs %>% 
   select(sampling_period_length, 
          water_tank_density_1_3km, veg_cover_cam,
@@ -264,14 +275,15 @@ mod10 <- occu( ~ water_tank_density_1_3km + woodland_percent_1_3km
               ~ 1, occu.meme)
 
 # Model selection
-top_mods <- model.sel(
-  mod1, mod2, mod3, mod4,mod5, mod6, mod7,mod8,mod9,mod10, meme.null)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, meme.null)
 
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "meme.null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Striped Skunk Base Models.xlsx", 
-       #  sheetName="Detection Models", append=T) 
 
 # Top model diagnostics
 
@@ -326,9 +338,9 @@ tree2 <- occu( ~  veg_cover_cam + woodland_percent_1_3km
                ~  tree_density_5_70 + tree_density_5_70_2, occu.meme)
 occu.null.aicc - AICc(tree2) #worse than null 
 
-ndvi.site <- occu( ~ veg_cover_cam + woodland_percent_1_3km
-                   ~ NDVI_1_3km, occu.meme)          
-occu.null.aicc - AICc(ndvi.site,k=2) #worse than null 
+ndvi <- occu( ~ veg_cover_cam + woodland_percent_1_3km
+              ~ NDVI_1_3km, occu.meme)          
+occu.null.aicc - AICc(ndvi, k=2) #worse than null 
 
 ndvi2 <- occu( ~ veg_cover_cam + woodland_percent_1_3km
                ~ NDVI_1_3km + NDVI_1_3km2, occu.meme)          
@@ -349,6 +361,10 @@ grassland <- occu( ~ veg_cover_cam + woodland_percent_1_3km
 occu.null.aicc - AICc(grassland) #better than null
 confint(grassland, level=0.85, type="state") #85% CI does not overlap zero
 
+grassland2 <- occu( ~ veg_cover_cam + woodland_percent_1_3km
+                   ~ herbaceous_cov2, occu.meme)
+occu.null.aicc - AICc(grassland2) #worse than null
+
 wood <- occu(  ~ veg_cover_cam + woodland_percent_1_3km
                ~ woodland_percent_1_3km, occu.meme)          
 occu.null.aicc - AICc(wood, k=2) #worse than null
@@ -357,10 +373,10 @@ wood2 <- occu(  ~ veg_cover_cam + woodland_percent_1_3km
                 ~ woodland_percent_1_3km + woodland_percent_1_3km, occu.meme)          
 occu.null.aicc - AICc(wood2, k=2) #worse than null
 
-bio.com2 <- occu( ~ veg_cover_cam + woodland_percent_1_3km
-                  ~ as.factor(biotic_com_2), occu.meme, 
+bio.com <- occu( ~ veg_cover_cam + woodland_percent_1_3km
+                 ~ as.factor(biotic_com_2), occu.meme, 
                   starts = c(-2, -2, -1, 0, 1))        
-occu.null.aicc - AICc(bio.com2, k=2) #worse than null
+occu.null.aicc - AICc(bio.com, k=2) #worse than null
 
 # herbaceous cov proceeds
 
@@ -426,14 +442,15 @@ null <-  occu( ~ veg_cover_cam + woodland_percent_1_3km
 mod1 <-  occu( ~ veg_cover_cam + woodland_percent_1_3km 
                ~ herbaceous_cov, occu.meme)
 
-# Combine models in model selection table
-top_mods <- model.sel(mod1, null)
+# Model selection
+cand.models <- list(mod1, null)
+
+modnames <- c("mod1", "null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Striped Skunk Base Models.xlsx", 
-        #  sheetName="Occupancy Models", append=T) 
 
 # Top model diagnostics
 

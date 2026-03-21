@@ -9,16 +9,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 25.
+#should need to change for the script to run (assuming packages are installed)
+#is the homewd directory on line 21.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -26,6 +22,14 @@ homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
+
+# Load packages 
+library(unmarked)
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(patchwork)
+library(cowplot)
 
 ###########################################################
 # MULE DEER BASE MODELS #
@@ -35,6 +39,10 @@ setwd(paste0(homewd, "data/"))
 
 # Read in edited .csv
 detHist <- read.csv(file = "mule deer detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -45,13 +53,17 @@ occu.odhe <- unmarkedFrameOccu(y=detHist,
                                siteCovs = site.covs.scaled, 
                                obsCovs = obsCovs.scaled)
 
+# Read in unscaled site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 # ================================
 # Mule deer detection variables 
 # ================================
 
 # Top detection model
 
-mod1 <- occu( ~ max_trig_dist + NDVI_1_9km ~ 1, occu.odhe)
+mod1 <- occu( ~ max_trig_dist + livestock.count ~ 1, occu.odhe,
+                starts = c(0, -2, -1, -2))
 
 #### Plot max trigger distance ####
 
@@ -70,7 +82,7 @@ seq_scaled <- (seq_unscaled - base_mean) / base_sd
 plot_data <- data.frame(
   max_trig_dist = seq_scaled,
   max_trig_dist_unscaled = seq_unscaled,
-  NDVI_1_9km = 0
+  livestock.count = 0
 )
 
 # Predict
@@ -81,16 +93,15 @@ plot_data$upper <- preds$upper
 
 # Create site_data for observed points
 site_data <- site.covs %>%
-  dplyr::select(NDVI_1_9km, max_trig_dist) %>%
-  mutate(max_trig_dist_scaled = 
-           (max_trig_dist - base_mean) / base_sd,
-         NDVI_1_9km = 0
+  dplyr::select(max_trig_dist) %>%
+  mutate(max_trig_dist_scaled = (max_trig_dist - base_mean) / base_sd,
+         livestock.count = 0
   )
 
 # Predict for observed sites
 site_preds <- predict(mod1, type = "det", newdata = data.frame(
   max_trig_dist = site_data$max_trig_dist_scaled,
-  NDVI_1_9km = site_data$NDVI_1_9km
+  livestock.count = 0
 ))
 
 site_data$Predicted <- site_preds$Predicted
@@ -117,77 +128,58 @@ deer.trig  <- ggplot(plot_data, aes(x = max_trig_dist_unscaled,
 
 deer.trig
 
-#### Plot NDVI ####
+#### Plot livestock count ####
 
-base_mean <- mean(site.covs$NDVI_1_9km, na.rm = TRUE)
-base_sd   <- sd(site.covs$NDVI_1_9km, na.rm = TRUE)
+# Read in observation-level covariates
+obsCovs <- readRDS("obsCovs.RData")
 
-# Generate sequence of unscaled values, then scale them
-seq_unscaled <- seq(min(site.covs$NDVI_1_9km, 
-                        na.rm = TRUE),
-                    max(site.covs$NDVI_1_9km,
-                        na.rm = TRUE),
-                    length.out = 100)
-seq_scaled <- (seq_unscaled - base_mean) / base_sd
+#  Compute mean & SD from original unscaled obsCovs
+stock_vec <- as.numeric(as.matrix(obsCovs$livestock.count))
 
-# Create plot prediction dataset 
-plot_data <- data.frame(
-  NDVI_1_9km = seq_scaled,
-  NDVI_1_9km_unscaled = seq_unscaled,
-  max_trig_dist = 0
+stock_mean <- mean(stock_vec, na.rm = TRUE)
+stock_sd   <- sd(stock_vec, na.rm = TRUE)
+
+# Generate sequences of unscaled values
+seq_stock_unscaled <- seq(min(stock_vec, na.rm = TRUE),
+                          max(stock_vec, na.rm = TRUE),
+                          length.out = 100)
+
+# Scale them for prediction
+seq_stock_scaled <- (seq_stock_unscaled - stock_mean) / stock_sd
+
+# Build prediction datasets
+pred_df <- data.frame(
+  livestock.count = seq_stock_scaled,
+  max_trig_dist = 0  
 )
 
-# Predict
-preds <- predict(mod1, type = "det", newdata = plot_data)
-plot_data$Predicted <- preds$Predicted
-plot_data$lower <- preds$lower
-plot_data$upper <- preds$upper
+# Predict detection probability
+pred_stock <- predict(mod1, type = "det", newdata = pred_df)
+pred_stock$stock_unscaled <- seq_stock_unscaled
 
-# Create site_data for observed points
-site_data <- site.covs %>%
-  dplyr::select(NDVI_1_9km, max_trig_dist) %>%
-  mutate(NDVI_1_9km_scaled = 
-           (NDVI_1_9km - base_mean) / base_sd,
-         max_trig_dist = 0
-  )
-
-# Predict for observed sites
-site_preds <- predict(mod1, type = "det", newdata = data.frame(
-  NDVI_1_9km = site_data$NDVI_1_9km_scaled,
-  max_trig_dist = site_data$max_trig_dist
-))
-
-site_data$Predicted <- site_preds$Predicted
-site_data$lower <- site_preds$lower
-site_data$upper <- site_preds$upper
-
-# Plot 
-deer.ndvi  <- ggplot(plot_data, aes(x = NDVI_1_9km_unscaled, 
-                                    y = Predicted)) +
+# Plot human activity effect
+deer.stock <- ggplot(pred_stock, aes(x = stock_unscaled, y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
   geom_line(color = "black", linewidth = 0.7) +
   scale_x_continuous(breaks = pretty_breaks(n = 6)) +
   scale_y_continuous(limits = c(0, 1)) +
-  labs(x = "NDVI within 1.9 km radius",
+  labs(x = "Livestock detected during sampling occasion", 
        y = "Probability of detection (p)") +
   theme_classic() +
-  theme(
-    axis.title = element_text(size = 16),   # axis labels bigger
-    axis.text  = element_text(size = 14),   # tick labels bigger
-    axis.line  = element_line(size = 0.8),  # slightly bolder axis lines
-    axis.ticks = element_line(size = 0.8)   # bolder ticks
-  )
+  theme(axis.title = element_text(size = 16),
+        axis.text  = element_text(size = 14))
 
-deer.ndvi
+deer.stock 
 
 # ================================
 # Mule deer habitat selection variables 
 # ================================
 
 # Full mule deer base model 
-mod1 <- occu( ~ max_trig_dist + NDVI_1_9km  
-              ~ shrub_yucca_density + veg_cover, occu.odhe)
+mod1 <- occu( ~ max_trig_dist + livestock.count   
+              ~ shrub_yucca_density + veg_cover, occu.odhe,
+                starts = c(0, -2, -5, -2, -1, -2))
 
 #### Plot shrub density ####
 
@@ -253,7 +245,7 @@ deer.shrub  <- ggplot(plot_data, aes(x = shrub_yucca_density_unscaled,
 
 deer.shrub
 
-#### Plot visual obstruction ####
+#### Plot vegetation concealment cover ####
 
 base_mean <- mean(site.covs$veg_cover, na.rm = TRUE)
 base_sd   <- sd(site.covs$veg_cover, na.rm = TRUE)
@@ -298,7 +290,7 @@ site_data$lower <- site_preds$lower
 site_data$upper <- site_preds$upper
 
 # Plot 
-deer.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_unscaled, 
+deer.veg.cov  <- ggplot(plot_data, aes(x = veg_cover_unscaled, 
                                      y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
@@ -315,13 +307,13 @@ deer.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_unscaled,
     axis.ticks = element_line(size = 0.8)   # bolder ticks
   )
 
-deer.vis.obs
+deer.veg.cov
 
 # Create combined plot layout 
 
 final_plot <-
-  (deer.trig  | deer.ndvi ) /
-  (deer.shrub | deer.vis.obs)   +
+  (deer.trig  | deer.stock ) /
+  (deer.shrub | deer.veg.cov)   +
   plot_layout(widths = c(1,1), heights = c(1,1)) +
   plot_annotation(
     title = "Mule deer",
@@ -341,8 +333,8 @@ final_plot <-
 final_plot
 
 # Save as .png
-#ggsave("mule_deer_base_plots.png", final_plot, width = 12, 
-#height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/mule_deer_base_plots.png"), final_plot, 
+       width = 12, height = 12, dpi = 300)
 
 
 ###########################################################
@@ -370,7 +362,7 @@ occu.anam <- unmarkedFrameOccu(y=detHist,
 # Top detection model
 mod1 <- occu( ~ veg_cover_cam ~ 1, occu.anam)
 
-#### Visual obstruction transect 1 plot ####
+#### Veg cover transect 1 plot ####
 
 base_mean <- mean(site.covs$veg_cover_cam, na.rm = TRUE)
 base_sd   <- sd(site.covs$veg_cover_cam, na.rm = TRUE)
@@ -412,7 +404,7 @@ site_data$lower <- site_preds$lower
 site_data$upper <- site_preds$upper
 
 # Plot 
-prong.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled, 
+prong.veg.cov  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled, 
                                     y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
@@ -429,7 +421,7 @@ prong.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled,
     axis.ticks = element_line(size = 0.8)   # bolder ticks
   )
 
-prong.vis.obs
+prong.veg.cov
 
 # ================================
 # Pronghorn habitat selection variables 
@@ -500,8 +492,8 @@ prong.slope
 # Create combined plot layout 
 
 final_plot <-
-  (prong.vis.obs ) /
-  (prong.slope )  +
+  (prong.veg.cov) /
+  (prong.slope)  +
   plot_layout(widths = c(1,1), heights = c(1,1)) +
   plot_annotation(
     title = "Pronghorn",
@@ -521,7 +513,8 @@ final_plot <-
 final_plot 
 
 # Save layout as .png
-#ggsave("prong_base_plots.png", final_plot, width = 12, height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/prong_base_plots.png"), final_plot, width = 12,
+              height = 12, dpi = 300)
 
 
 ###########################################################
@@ -549,85 +542,84 @@ occu.cala <- unmarkedFrameOccu(y=detHist,
 
 # Top detection model
 
-mod1 <- occu( ~ human.active + cow.active 
-              ~ 1, occu.cala, starts = c(2, 0, -3, 0))
+mod1 <- occu( ~ people.active + cottontail.active 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
 
-#### Human activity and cow activity plots ####
+#### People activity and cottontail activity plots ####
 
 #  Compute mean & SD from original unscaled obsCovs
-human_vec <- as.numeric(as.matrix(obsCovs$human.active))
-cow_vec   <- as.numeric(as.matrix(obsCovs$cow.active))
+people_vec <- as.numeric(as.matrix(obsCovs$people.active))
+cotton_vec   <- as.numeric(as.matrix(obsCovs$cottontail.active))
 
-human_mean <- mean(human_vec, na.rm = TRUE)
-human_sd   <- sd(human_vec, na.rm = TRUE)
+people_mean <- mean(people_vec, na.rm = TRUE)
+people_sd   <- sd(people_vec, na.rm = TRUE)
 
-cow_mean <- mean(cow_vec, na.rm = TRUE)
-cow_sd   <- sd(cow_vec, na.rm = TRUE)
-
+cotton_mean <- mean(cotton_vec, na.rm = TRUE)
+cotton_sd   <- sd(cotton_vec, na.rm = TRUE)
 
 # Generate sequences of unscaled values
-seq_human_unscaled <- seq(min(human_vec, na.rm = TRUE),
-                          max(human_vec, na.rm = TRUE),
+seq_people_unscaled <- seq(min(people_vec, na.rm = TRUE),
+                          max(people_vec, na.rm = TRUE),
                           length.out = 100)
-seq_cow_unscaled   <- seq(min(cow_vec, na.rm = TRUE),
-                          max(cow_vec, na.rm = TRUE),
+seq_cotton_unscaled   <- seq(min(cotton_vec, na.rm = TRUE),
+                          max(cotton_vec, na.rm = TRUE),
                           length.out = 100)
 
 # Scale them for prediction
-seq_human_scaled <- (seq_human_unscaled - human_mean) / human_sd
-seq_cow_scaled   <- (seq_cow_unscaled - cow_mean) / cow_sd
+seq_people_scaled <- (seq_people_unscaled - people_mean) / people_sd
+seq_cotton_scaled   <- (seq_cotton_unscaled - cotton_mean) / cotton_sd
 
 # Build prediction datasets
-pred_human_df <- data.frame(
-  human.active = seq_human_scaled,
-  cow.active   = 0  # hold cow at mean
+pred_people_df <- data.frame(
+  people.active = seq_people_scaled,
+  cottontail.active   = 0  
 )
 
-pred_cow_df <- data.frame(
-  human.active = 0,  # hold human at mean
-  cow.active   = seq_cow_scaled
+pred_cotton_df <- data.frame(
+  people.active = 0,  
+  cottontail.active   = seq_cotton_scaled
 )
 
 # Predict detection probability
-pred_human <- predict(mod1, type = "det", newdata = pred_human_df)
-pred_human$human_unscaled <- seq_human_unscaled
+pred_people <- predict(mod1, type = "det", newdata = pred_people_df)
+pred_people$people_unscaled <- seq_people_unscaled
 
-pred_cow <- predict(mod1, type = "det", newdata = pred_cow_df)
-pred_cow$cow_unscaled <- seq_cow_unscaled
+pred_cotton <- predict(mod1, type = "det", newdata = pred_cotton_df)
+pred_cotton$cotton_unscaled <- seq_cotton_unscaled
 
-# Plot human activity effect
-coy.human <- ggplot(pred_human, aes(x = human_unscaled, y = Predicted)) +
+# Plot people activity effect
+coy.people <- ggplot(pred_people, aes(x = people_unscaled, y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
   geom_line(color = "black", linewidth = 0.7) +
   scale_x_continuous(breaks = pretty_breaks(n = 6)) +
   scale_y_continuous(limits = c(0, 1)) +
-  labs(x = "Hours humans detected", y = "Probability of detection (p)") +
+  labs(x = "Hours people detected", y = "Probability of detection (p)") +
   theme_classic() +
   theme(axis.title = element_text(size = 16),
         axis.text  = element_text(size = 14))
 
-coy.human
+coy.people
 
-# Plot cow activity effect
+# Plot cottontail activity effect
 
-coy.cow <- ggplot(pred_cow, aes(x = cow_unscaled, y = Predicted)) +
+coy.cotton <- ggplot(pred_cotton, aes(x = cotton_unscaled, y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
   geom_line(color = "black", linewidth = 0.7) +
   scale_x_continuous(breaks = pretty_breaks(n = 6)) +
   scale_y_continuous(limits = c(0, 1)) +
-  labs(x = "Hours cattle detected", y = "Probability of detection (p)") +
+  labs(x = "Hours cottontails detected", y = "Probability of detection (p)") +
   theme_classic() +
   theme(axis.title = element_text(size = 16),
         axis.text  = element_text(size = 14))
 
-coy.cow
+coy.cotton
 
 # Create combined plot layout 
 
 final_plot <-
-  (coy.human | coy.cow) +
+  (coy.people | coy.cotton) +
   plot_layout(widths = c(1,1), heights = c(1,1)) +
   plot_annotation(
     title = "Coyote",
@@ -647,7 +639,8 @@ final_plot <-
 final_plot
 
 # Save layout to .png
-#ggsave("coy_base_plots.png", final_plot, width = 12, height = 11, dpi = 300)
+ggsave(paste0(homewd, "figures/coy_base_plots.png"), final_plot, width = 12, 
+       height = 11, dpi = 300)
 
 ###########################################################
 # KIT FOX BASE MODELS #
@@ -707,7 +700,7 @@ kit.fox.cam
 
 #### NDVI plot ####
 
-mod1 <- occu(~ cam_moved + NDVI_1_9km ~ 1, occu.vuma)
+mod1 <- occu( ~ cam_moved + NDVI_1_9km ~ 1, occu.vuma)
 
 base_mean <- mean(site.covs$NDVI_1_9km, na.rm = TRUE)
 base_sd   <- sd(site.covs$NDVI_1_9km, na.rm = TRUE)
@@ -778,7 +771,7 @@ kit.fox.ndvi
 # Full kit fox base model 
 mod1 <- occu( ~  as.factor(cam_moved) + NDVI_1_9km 
               ~ coy_count_avg + jackrabbit_count_avg, occu.vuma, 
-                starts = c(-1, -1, -1, -1, -1, -1))
+                starts = c(-1, -3, 3, -5, -1, -2))
 
 #### Coyote count plot ####
 
@@ -931,8 +924,8 @@ final_plot <-
 final_plot
 
 # Save plot layout to .png
-#ggsave("kit_fox_base_plots.png", final_plot, width = 12, 
-#height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/kit_fox_base_plots.png"), final_plot, 
+              width = 12, height = 12, dpi = 300)
 
 
 ###########################################################
@@ -1153,8 +1146,8 @@ final_plot <-
 final_plot
 
 # Save layout to .png
-#ggsave("gray_fox_base_plots.png", final_plot, width = 12, 
-#height = 10, dpi = 300)
+ggsave(paste0(homewd, "figures/gray_fox_base_plots.png"), final_plot, 
+       width = 12, height = 10, dpi = 300)
 
 ###########################################################
 # AMERICAN BADGER BASE MODELS #
@@ -1434,7 +1427,8 @@ final_plot <-
 final_plot
 
 # Save layout to .png
-#ggsave("badger_base_plots.png", final_plot, width = 12, height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/badger_base_plots.png"), final_plot, 
+       width = 12, height = 12, dpi = 300)
 
 
 ###########################################################
@@ -1461,10 +1455,9 @@ occu.meme <- unmarkedFrameOccu(y=detHist,
 # ================================
 
 # Top detection model
-mod1 <-  occu( ~ veg_cover_cam + woodland_percent_1_3km ~ 1, 
-                 occu.meme)
+mod1 <-  occu( ~ veg_cover_cam + woodland_percent_1_3km ~ 1, occu.meme)
 
-#### Visual obstruction transect 1 plot ####
+#### Veg cover transect 1 plot ####
 
 base_mean <- mean(site.covs$veg_cover_cam, na.rm = TRUE)
 base_sd   <- sd(site.covs$veg_cover_cam, na.rm = TRUE)
@@ -1509,7 +1502,7 @@ site_data$lower <- site_preds$lower
 site_data$upper <- site_preds$upper
 
 # Plot 
-skunk.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled, 
+skunk.veg.cov  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled, 
                                         y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
@@ -1526,7 +1519,7 @@ skunk.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_unscaled,
     axis.ticks = element_line(size = 0.8)   # bolder ticks
   )
 
-skunk.vis.obs
+skunk.veg.cov
 
 #### Percent woodland plots ####
 
@@ -1664,7 +1657,7 @@ skunk.grass
 # Create combined layout plot
 
 final_plot <-
-  (skunk.vis.obs | skunk.wood | skunk.grass ) +
+  (skunk.veg.cov | skunk.wood | skunk.grass ) +
   plot_layout(widths = c(1), heights = c(1,1)) +
   plot_annotation(
     title = "Striped skunk",
@@ -1684,7 +1677,8 @@ final_plot <-
 final_plot
 
 # Save layout as .png
-#ggsave("skunk_base_plots.png", final_plot, width = 12, height = 10, dpi = 300)
+ggsave(paste0(homewd, "figures/skunk_base_plots.png"), final_plot, width = 12,
+       height = 10, dpi = 300)
 
 
 ###########################################################
@@ -1714,7 +1708,7 @@ occu.leca <- unmarkedFrameOccu(y=detHist,
 # Top detection model
 mod1 <- occu( ~ veg_cover_cam_under_1m ~ 1, occu.leca)
 
-#### Visual obstruction under 1 m plot ####
+#### Veg cover under 1 m plot ####
 
 # Get mean and SD of wind variable
 base_mean <- mean(site.covs$veg_cover_cam_under_1m, na.rm = TRUE)
@@ -1758,7 +1752,7 @@ site_data$lower <- site_preds$lower
 site_data$upper <- site_preds$upper
 
 # Plot 
-jack.vis.obs  <- ggplot(plot_data, aes(x = 
+jack.veg.cov  <- ggplot(plot_data, aes(x = 
                                    veg_cover_cam_under_1m_unscaled, 
                                        y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
@@ -1776,7 +1770,7 @@ jack.vis.obs  <- ggplot(plot_data, aes(x =
     axis.ticks = element_line(size = 0.8)   # bolder ticks
   )
 
-jack.vis.obs
+jack.veg.cov
 
 #### Precipitation ####
 
@@ -1951,7 +1945,7 @@ jack.wood
 
 # Create combined layout plot
 final_plot <-
-  (jack.precip | jack.vis.obs ) /
+  (jack.precip | jack.veg.cov) /
   (jack.wood   | jack.slope ) +
   plot_layout(widths = c(1,1), heights = c(1,1)) +
   plot_annotation(
@@ -1972,7 +1966,8 @@ final_plot <-
 final_plot
 
 # Save layout to .png
-#ggsave("jack_base_plots.png", final_plot, width = 12, height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/jack_base_plots.png"), final_plot, width = 12,
+       height = 12, dpi = 300)
 
 
 ###########################################################
@@ -2002,7 +1997,7 @@ occu.syau <- unmarkedFrameOccu(y=detHist,
 mod1 <- occu( ~  veg_cover_cam_under_1m + biotic_com_2
               ~  1, occu.syau)
 
-#### Visual obstruction under 1m plot ####
+#### Veg cov under 1m plot ####
 
 # Fit model using scaled wind variable
 mod1 <- occu( ~ veg_cover_cam_under_1m ~ 1, occu.syau)
@@ -2048,7 +2043,7 @@ site_data$lower <- site_preds$lower
 site_data$upper <- site_preds$upper
 
 # Plot 
-cotton.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_under_1m_unscaled, 
+cotton.veg.cov  <- ggplot(plot_data, aes(x = veg_cover_cam_under_1m_unscaled, 
                                   y = Predicted)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, 
               fill = "darkgray") +
@@ -2065,7 +2060,7 @@ cotton.vis.obs  <- ggplot(plot_data, aes(x = veg_cover_cam_under_1m_unscaled,
     axis.ticks = element_line(size = 0.8)   # bolder ticks
   )
 
-cotton.vis.obs 
+cotton.veg.cov
 
 #### biotic community plot ####
 
@@ -2181,7 +2176,7 @@ cotton.ndvi
 # Create combined layout plot
 
 final_plot <-
-  (cotton.biotic | cotton.vis.obs | cotton.ndvi) +
+  (cotton.biotic | cotton.veg.cov | cotton.ndvi) +
   plot_layout(widths = c(1), heights = c(1)) +
   plot_annotation(
     title = "Desert cottontail",
@@ -2201,9 +2196,8 @@ final_plot <-
 final_plot
 
 # Save layout to .png
-#ggsave("cottontail_base_plots.png", final_plot, width = 12, 
-       #height = 10, dpi = 300)
-
+ggsave(paste0(homewd, "figures/cottontail_base_plots.png"), final_plot, 
+              width = 12, height = 10, dpi = 300)
 
 ########################################################
 ######################### END ##########################

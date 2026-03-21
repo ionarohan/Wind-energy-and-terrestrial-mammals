@@ -26,6 +26,7 @@ library(tidyverse)
 library(unmarked)
 library(MuMIn)
 library(xlsx)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR COYOTE OCCUPANCY MODELS #
@@ -76,8 +77,10 @@ backTransform(cala.null['state'])
 ##### Water Hypothesis Group ####
 
 water.tank.dense <- occu( ~ water_tank_density_2_4_km 
-                          ~ 1, occu.cala, starts = c(-1, 0, 0))       
-null.aicc - AICc(water.tank.dense) #worse than null
+                          ~ 1, occu.cala, starts = c(3, -3, 0))       
+null.aicc - AICc(water.tank.dense) #better than null
+confint(water.tank.dense, level=0.85, type="det") 
+# 85% CI does not overlaps zero but is negative (no support for hypothesis)
 
 water.dist.tank <- occu( ~ dist_water_tank ~ 1, occu.cala, 
                          starts = c(-1, -1, 0))      
@@ -100,13 +103,14 @@ null.aicc - AICc(precip.cm) #worse than null
 
 # Long-term precipitation
 
-days.since.rain <- occu( ~ days.since.rain ~ 1, occu.cala, starts = c(-1, 0, 0))    
-null.aicc - AICc(days.since.rain, k=2) #worse than null
+days.since.rain <- occu( ~ days.since.rain ~ 1, occu.cala, starts = c(5, -3, 0))
+null.aicc - AICc(days.since.rain, k=2) #better than null
+confint(days.since.rain, level=0.85, type="det") #85% CI does not overlap zero
 
-rain.month <- occu( ~ rain.month ~ 1, occu.cala, starts = c(2, 0, -3))    
+rain.month <- occu( ~ rain.month ~ 1, occu.cala, starts = c(5, -3, 0))    
 null.aicc - AICc(rain.month, k=2) #worse than null
 
-rain.week <- occu( ~ rain.week ~ 1, occu.cala, starts = c(-1, -1, -1))    
+rain.week <- occu( ~ rain.week ~ 1, occu.cala, starts = c(5, -3, 0))    
 null.aicc - AICc(rain.week, k=2) #worse than null
 
 # Water source and long-term precipitation interaction
@@ -116,18 +120,19 @@ precip.water.dense <- occu( ~ water_tank_density_2_4_km * days.since.rain
 null.aicc - AICc(precip.water.dense, k=2) #better than null
 confint(precip.water.dense, level=0.85, type="det") #85% CI overlaps zero
 
-# none proceeds
+# days since rain proceeds
 
 #### Humidity Hypothesis Group ####
 
-humidity <- occu( ~ humid ~ 1, occu.cala, starts = c(2, 0, -3))       
-null.aicc - AICc(humidity, k=2) #worse than null
+humidity <- occu( ~ humid ~ 1, occu.cala, starts = c(5, -3, 0))       
+null.aicc - AICc(humidity, k=2) #better than null
+confint(humidity, level=0.85, type="det") #85% CI does not overlap zero
 
-# none proceed
+# humidity proceeds
 
 ##### Temperature Hypothesis Group ####
 
-temp.max <- occu( ~ max.temp ~ 1, occu.cala, starts = c(-1, 0, 0))       
+temp.max <- occu( ~ max.temp ~ 1, occu.cala, starts = c(5, -3, 0))       
 null.aicc - AICc(temp.max, k=2) #worse than null
 
 # Temperature interactions
@@ -138,37 +143,41 @@ null.aicc - AICc(temp.water, k=2) #worse than null
 temp.humid <- occu( ~ max.temp * humid ~ 1, occu.cala)      
 null.aicc - AICc(temp.humid, k=2) #worse than null
 
-temp.canopy <- occu( ~ max.temp * canopy_cov ~ 1, occu.cala)      
+temp.canopy <- occu( ~ max.temp * canopy_cov ~ 1, occu.cala, 
+                       starts = c(5, -3, 0, 0, 0))      
 null.aicc - AICc(temp.canopy, k=2)  #worse than null
 
 #none proceed
 
 #### Wind Hypothesis Group ####
 
-wind <- occu( ~ wind ~ 1, occu.cala, starts = c(-1, 0, 0))       
+wind <- occu( ~ wind ~ 1, occu.cala, starts = c(5, -3, 0))       
 null.aicc - AICc(wind, k=2) #worse than null
 
 #none proceed
 
 ##### Livestock Activity Hypothesis Group####
 
-cow.hours <- occu( ~ cow.active ~ 1, occu.cala, starts = c(-1, 0, 0))       
+cow.hours <- occu( ~ cow.active ~ 1, occu.cala, starts = c(1, -2, 0))       
 null.aicc - AICc(cow.hours) #better than null
 confint(cow.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
-cow.total <- occu( ~ cow.count ~ 1, occu.cala, starts = c(-1, 0, 0))       
-null.aicc - AICc(cow.total,k=2) #worse than null
+cow.total <- occu( ~ cow.count ~ 1, occu.cala, starts = c(5, -3, 0))       
+null.aicc - AICc(cow.total,k=2) #better than null
+confint(cow.total, level=0.85, type="det") # 85% CI does not overlap zero
 
-sheep.hours <- occu( ~ sheep.active ~ 1, occu.cala, starts = c(2, 0, -3))       
+sheep.hours <- occu( ~ sheep.active ~ 1, occu.cala, starts = c(5, -3, -2))   
+                    # large SE for sheep hours
 null.aicc - AICc(sheep.hours, k=2) #worse than null
 
-sheep.total <- occu( ~ sheep.count ~ 1, occu.cala, starts = c(0, -1, 0))       
+sheep.total <- occu( ~ sheep.count ~ 1, occu.cala, starts = c(5, -3, -5))    
+                  # large SE for sheep count
 null.aicc - AICc(sheep.total,k=2) #worse than null
 
-stock.total <- occu( ~ livestock.count ~ 1, occu.cala, starts = c(-1, 0, 0))
+stock.total <- occu( ~ livestock.count ~ 1, occu.cala, starts = c(5, -3, 0))
 null.aicc - AICc(stock.total,k=2)  #worse than null
 
-stock.hours <- occu( ~ livestock.active ~ 1, occu.cala, starts = c(-1, 0, 0))     
+stock.hours <- occu( ~ livestock.active ~ 1, occu.cala, starts = c(1, -2, 0))
 null.aicc - AICc(stock.hours,k=2) #better than null
 confint(stock.hours, level=0.85, type="det")  # 85% CI does not overlap zero
 
@@ -187,7 +196,7 @@ lagomorph.total <- occu( ~ lagomorph.count
 null.aicc - AICc(lagomorph.total,k=2) #worse than null
 
 lagomorph.hours <- occu( ~ lagomorph.active 
-                         ~ 1, occu.cala, starts = c(-1, -1, -1))     
+                         ~ 1, occu.cala, starts = c(1, -2, 0))     
 null.aicc - AICc(lagomorph.hours,k=2) #better than null
 confint(lagomorph.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
@@ -196,15 +205,16 @@ cottontail.total <- occu( ~ cottontail.count
 null.aicc - AICc(cottontail.total,k=2) #worse than null
 
 cottontail.hours <- occu( ~ cottontail.active 
-                          ~ 1, occu.cala, starts = c(-1, -1, -1))     
-null.aicc - AICc(cottontail.hours,k=2) #worse than null
+                          ~ 1, occu.cala, starts = c(1, -2, 0))     
+null.aicc - AICc(cottontail.hours,k=2)  #better than null
+confint(cottontail.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
 jackrabbit.total <- occu( ~ jackrabbit.count
                           ~ 1, occu.cala, starts = c(-1, 0, 0))
 null.aicc - AICc(jackrabbit.total,k=2) #worse than null
 
 jackrabbit.hours <- occu( ~ jackrabbit.active 
-                          ~ 1, occu.cala, starts = c(-1, -1, -1))     
+                          ~ 1, occu.cala, starts = c(5, -3, 0))     
 null.aicc - AICc(jackrabbit.hours,k=2) #worse than null
 
 ungulate.total <- occu( ~ ungulate.count 
@@ -216,33 +226,34 @@ ungulate.hours <- occu( ~ ungulate.active
 null.aicc - AICc(ungulate.hours,k=2) #better than null
 confint(ungulate.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
-# lagomorph hours proceeds
+# cottontail hours proceeds
 
 ##### Human Activity Hypothesis Group#####
 
-vehicle.total <- occu( ~ vehicle.count ~ 1, occu.cala, starts = c(0, -1, -1))
+vehicle.total <- occu( ~ vehicle.count ~ 1, occu.cala, starts = c(5, -3, -1))
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.cala, starts = c(0, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.cala, starts = c(5, -3, -1))
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
-people.hours <- occu( ~ people.active ~ 1, occu.cala, starts = c(0, -1, -1))
-null.aicc - AICc(people.hours,k=2) #worse than null
+people.hours <- occu( ~ people.active ~ 1, occu.cala, starts = c(5, -3, -1))
+null.aicc - AICc(people.hours,k=2) #better than null
+confint(people.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
-human.hours <- occu( ~ human.active ~ 1, occu.cala, starts = c(0, -1, -1)) 
+human.hours <- occu( ~ human.active ~ 1, occu.cala, starts = c(1, -2, -1)) 
 null.aicc - AICc(human.hours,k=2) #better than null
 confint(human.hours, level=0.85, type="det") # 85% CI does not overlap zero
 
-# human hours proceeds
+# people hours proceeds
 
 #### Road Hypothesis Group #####
 
-small.rd <- occu( ~ small_rd_dist ~ 1, occu.cala, starts = c(-1, -1, -1))     
+small.rd <- occu( ~ small_rd_dist ~ 1, occu.cala, starts = c(5, -3, 0))     
 null.aicc - AICc(small.rd,k=2) #worse than null
 
 ##### Biotic Community Type Hypothesis Group ####
 
-wood <- occu( ~ woodland_percent_2_4km ~ 1, occu.cala, starts = c(-1, -1, -1))          
+wood <- occu( ~ woodland_percent_2_4km ~ 1, occu.cala, starts = c(-1, -1, -1))
 null.aicc - AICc(wood) #worse than null
 
 wood2 <- occu( ~ woodland_percent_2_4km + woodland_percent_2_4km2 
@@ -260,8 +271,11 @@ null.aicc - AICc(ndvi2, k=2) #better than null
 confint(ndvi2, level=0.85, type="det") 
 # 85% CI does not overlaps zero but is positive (no support for hypothesis)
 
-bio.com2 <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.cala, starts = c(1, 0, 0))
-null.aicc - AICc(bio.com2, k=2) #worse than null
+bio.com2 <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.cala, 
+                    starts = c(5, -3, 0))
+null.aicc - AICc(bio.com2, k=2) #better than null
+confint(bio.com2, level=0.85, type="det") 
+# 85% CI does not overlaps zero but is negative (no support for hypothesis)
 
 tree <- occu( ~ tree_density_5_70 ~ 1, occu.cala)
 null.aicc - AICc(tree)  #better than null
@@ -275,21 +289,21 @@ null.aicc - AICc(tree2)  #worse than null
 
 ##### Vegetation Concealment Cover Hypothesis Group ####
 
-obs.distance <- occu( ~ obs_dist ~ 1, occu.cala, starts = c(2, 1, 1))       
+obs.distance <- occu( ~ obs_dist ~ 1, occu.cala, starts = c(5, -3, 0))       
 null.aicc - AICc(obs.distance, k=2) #worse than null
 
 obs.distance2 <- occu( ~ obs_dist + obs_dist2 
                        ~ 1, occu.cala, starts = c(2, 1, 1, -3))       
 null.aicc - AICc(obs.distance2, k=2) #worse than null
 
-veg.cov.cam <- occu( ~ veg_cover_cam ~ 1, occu.cala, starts = c(2, 1, 1))       
+veg.cov.cam <- occu( ~ veg_cover_cam ~ 1, occu.cala, starts = c(5, -3, 0))       
 null.aicc - AICc(veg.cov.cam, k=2) #worse than null
 
 veg.cov.cam2 <- occu( ~ veg_cover_cam + veg_cover_cam_2 
                       ~ 1, occu.cala, starts = c(2, 1, 1, -3))       
 null.aicc - AICc(veg.cov.cam2, k=2) #worse than null
 
-detect.angle <- occu( ~ detection_angle ~ 1, occu.cala, starts = c(2, 1, 1))  
+detect.angle <- occu( ~ detection_angle ~ 1, occu.cala, starts = c(5, -3, 0))  
 null.aicc - AICc(detect.angle, k=2) #worse than null
 
 detect.angle2 <- occu( ~ detection_angle + detection_angle2 ~ 1, occu.cala, 
@@ -309,7 +323,7 @@ null.aicc - AICc(max.trig.dist2, k=2) #worse than null
 
 ### Sampling Period Length ###
 samp.period <- occu( ~ sampling_period_length 
-                     ~ 1, occu.cala, starts = c(2, 1, -3))          
+                     ~ 1, occu.cala, starts = c(5, -3, 0))          
 null.aicc - AICc(samp.period,k=2) #worse than null
 
 ### Camera Moved ###
@@ -323,10 +337,12 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 # DETECTION MODEL SELECTION #
 #################################################
 
-# Variables that proceed (3)
+# Variables that proceed (5)
   # cow active
-  # human active
-  # lagomorph active 
+  # people active
+  # cottontail active 
+  # humid
+  # days since rain
 
 # Check correlations between detection variables 
 
@@ -335,8 +351,10 @@ obs.covs <- readRDS("obsCovs.RData")
 
 obs_cor <- cor(data.frame(
   cow = as.vector(obs.covs$cow.active),
-  human = as.vector(obs.covs$human.active),
-  lagomorph = as.vector(obs.covs$lagomorph.active)
+  people = as.vector(obs.covs$people.active),
+  cotton = as.vector(obs.covs$cottontail.active),
+  humid = as.vector(obs.covs$humid),
+  rain = as.vector(obs.covs$days.since.rain)
 ))
 # none correlated above |0.7|
 
@@ -347,64 +365,84 @@ obs_cor <- cor(data.frame(
 mod_null <- occu( ~ 1 ~ 1, occu.cala, starts = c(2, -3))
 
 # single variable models 
-mod1 <- occu( ~ human.active ~ 1, occu.cala, starts = c(2, 0, -3))
-mod2 <- occu( ~ lagomorph.active ~ 1, occu.cala, starts = c(2, 0, -3))
-mod3 <- occu( ~ cow.active ~ 1, occu.cala, starts = c(2, 0, -3))
+mod1 <- occu( ~ people.active ~ 1, occu.cala, starts = c(5, -3, 0))
+mod2 <- occu( ~ cottontail.active ~ 1, occu.cala, starts = c(5, -3, 0))
+mod3 <- occu( ~ cow.active ~ 1, occu.cala, starts = c(5, -3, 0))
+mod4 <- occu( ~ humid ~ 1, occu.cala, starts = c(5, -3, 0))
+mod5 <- occu( ~ days.since.rain ~ 1, occu.cala, starts = c(1, -3, 0))
 
 #2-variable models
-mod4 <- occu( ~ human.active + lagomorph.active 
-              ~ 1, occu.cala, starts = c(2, 0, -3, 0))
-mod5 <- occu( ~ human.active + cow.active 
-              ~ 1, occu.cala, starts = c(2, 0, -3, 0))
-mod6 <- occu( ~ lagomorph.active + cow.active 
-              ~ 1, occu.cala, starts = c(2, 0, -3, 0))
+mod6 <- occu( ~ people.active + cottontail.active 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod7 <- occu( ~ people.active + cow.active 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod8 <- occu( ~ people.active + humid 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod9 <- occu( ~ people.active + days.since.rain 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod10 <- occu( ~ cottontail.active + cow.active 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod11 <- occu( ~ cottontail.active + humid 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod12 <- occu( ~ cottontail.active + days.since.rain 
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod13 <- occu( ~ cow.active + humid
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod14 <- occu( ~ cow.active + days.since.rain
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
+mod15 <- occu( ~ humid + days.since.rain
+              ~ 1, occu.cala, starts = c(5, -3, 0, 0))
 
 # Model selection
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod_null)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, mod11, mod12, mod13, mod14, mod15, mod_null)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "mod11", "mod12", "mod13", "mod14", "mod15", 
+              "mod_null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
 
-# Run this code to see candidate detection models 
-  #write.xlsx(top_mods, file="Coyote Base Models.xlsx", 
-          # sheetName="Detection Models", append=T)  
-
 # Top model diagnostics
 
-summary(mod5)
-AICc(mod_null) - AICc(mod5) 
+summary(mod6)
+AICc(mod_null) - AICc(mod6) 
 
 ### Calculate the 85% confidence intervals for variables 
-confint(mod5, type = "det", level = 0.85)    
+confint(mod6, type = "det", level = 0.85)    
 #CIs for detection variables - none overlap zero
 
-confint(mod5, type = "state", level = 0.85) 
+confint(mod6, type = "state", level = 0.85) 
 #CIs for occupancy intercept - does not overlap zero
 
 # Calculate multicollinearity
-unmarked::vif(mod5, type = "det") # all below 2
+unmarked::vif(mod6, type = "det") # all below 2
 
 # Calculate mean daily detection probability with the top detection model
 
-backTransform(linearComb(mod5,                           
+backTransform(linearComb(mod6,                           
                          coefficients= c(1,0,0),  
                          type = 'det'))     
-# 0.0543  or 5.4%
+# 0.054  or 5.4%
 
 # Occupancy probability
 
-backTransform(linearComb(mod5,                
+backTransform(linearComb(mod6,                
                          coefficients=c(1),   
                          type = 'state')) 
-#  0.763 OR 76.3%
+#  0.765 OR 76.5%
 
 ### Calculating overall detection probability if K = 29
-1-(1-0.0543)^29
+1-(1-0.054)^29
 
 # 80% probability of detecting a mule deer at least once given the minimum
   #sampling period length at a site
 
 ### Calculating overall detection probability if K = 38
-1-(1-0.0543)^38
+1-(1-0.054)^38
 
 # 88% probability of detecting a mule deer at least once given the average
   #sampling period length at a site
@@ -423,51 +461,54 @@ backTransform(linearComb(mod5,
   # Models were limited to 6 parameters and were derived from the best-supported
   # detection model (mod1 above).
 
-occu.null.aicc <- AICc(mod5)
+occu.null.aicc <- AICc(mod6)
 
 #### Water Hypothesis Group #####
 
-water.tank.dense <- occu(  ~ human.active + cow.active
+water.tank.dense <- occu(  ~ people.active + cottontail.active
                            ~ water_tank_density_2_4_km, occu.cala)       
 occu.null.aicc - AICc(water.tank.dense)  #worse than null 
 
-water.dist.tank <- occu( ~ human.active + cow.active
-                         ~ dist_water_tank, occu.cala)      
+water.dist.tank <- occu( ~ people.active + cottontail.active
+                         ~ dist_water_tank, occu.cala, 
+                           starts = c(5, 0, -3, 0, 0))      
 occu.null.aicc - AICc(water.dist.tank, k=2) #worse than null 
 
 #none proceed
 
 #### Prey Activity Hypothesis Group####
 
-prey <- occu( ~ human.active + cow.active
-              ~ prey_count_avg, occu.cala)
+prey <- occu( ~ people.active + cottontail.active
+              ~ prey_count_avg, occu.cala, starts = c(5, -1, -3, 0, 0))
 occu.null.aicc - AICc(prey, k=2) #worse than null 
 
-lagomorph <- occu( ~ human.active + cow.active
+lagomorph <- occu( ~ people.active + cottontail.active
                    ~ lagomorph_count_avg, occu.cala)
 occu.null.aicc - AICc(lagomorph, k=2) #worse than null 
 
-rodent <- occu( ~ human.active + cow.active
-                ~ rodent_count_avg, occu.cala)
+rodent <- occu( ~ people.active + cottontail.active
+                ~ rodent_count_avg, occu.cala, starts = c(1, 5, -3, 0, 0))
+                #large SE for rodent count
 occu.null.aicc - AICc(rodent, k=2) #worse than null 
 
-jackrabbit <- occu( ~ human.active + cow.active
+jackrabbit <- occu( ~ people.active + cottontail.active
                     ~ jackrabbit_count_avg, occu.cala)
 occu.null.aicc - AICc(jackrabbit, k=2) #worse than null 
 
-cottontail <- occu( ~ human.active + cow.active
-                    ~ cottontail_count_avg, occu.cala)
+cottontail <- occu( ~ people.active + cottontail.active
+                    ~ cottontail_count_avg, occu.cala, 
+                      starts = c(5, -2, -3, 0, 0))
 occu.null.aicc - AICc(cottontail, k=2) #worse than null 
 
 # none proceed 
 
 #### Livestock Activity Hypothesis Group####
 
-stock <- occu( ~ human.active + cow.active
+stock <- occu( ~ people.active + cottontail.active
                ~ livestock_count_avg, occu.cala)
 occu.null.aicc - AICc(stock, k=2) #worse than null 
 
-cow <- occu( ~ human.active + cow.active
+cow <- occu( ~ people.active + cottontail.active
              ~ cow_count_avg, occu.cala)
 occu.null.aicc - AICc(cow, k=2) #worse than null 
 
@@ -475,65 +516,66 @@ occu.null.aicc - AICc(cow, k=2) #worse than null
 
 #### Biotic Community Type Hypothesis Group ####
 
-tree <- occu( ~ human.active + cow.active
+tree <- occu( ~ people.active + cottontail.active
               ~ tree_density_5_70, occu.cala)
 occu.null.aicc - AICc(tree) #worse than null 
 
-tree2 <- occu( ~ human.active + cow.active
+tree2 <- occu( ~ people.active + cottontail.active
                ~ tree_density_5_70 + tree_density_5_70_2, occu.cala)
 occu.null.aicc - AICc(tree2) #worse than null 
 
-shrubland <- occu( ~ human.active + cow.active
-                   ~ shrub_yucca_density, occu.cala)
+shrubland <- occu( ~ people.active + cottontail.active
+                   ~ shrub_yucca_density, occu.cala, 
+                     starts = c(5, 0, -3, 0, 0))
 occu.null.aicc - AICc(shrubland) #worse than null
 
-grassland <- occu( ~ human.active + cow.active
+grassland <- occu( ~ people.active + cottontail.active
                    ~ herbaceous_cov, occu.cala)
 occu.null.aicc - AICc(grassland) #worse than nu
 
-grassland2 <- occu( ~ human.active + cow.active
+grassland2 <- occu( ~ people.active + cottontail.active
                     ~ herbaceous_cov + herbaceous_cov2, occu.cala)
 occu.null.aicc - AICc(grassland2) #worse than null 
 
-wood2 <- occu(~ human.active + cow.active
-              ~ woodland_percent_2_4km + woodland_percent_2_4km2 , occu.cala)          
+wood2 <- occu(~ people.active + cottontail.active
+              ~ woodland_percent_2_4km + woodland_percent_2_4km2 , occu.cala) 
 occu.null.aicc - AICc(wood2,k=2)  #worse than null 
 
-wood <- occu(~ human.active + cow.active
+wood <- occu(~ people.active + cottontail.active
              ~ woodland_percent_2_4km, occu.cala)          
 occu.null.aicc - AICc(wood,k=2) #worse than null 
 
-ndvi <- occu( ~ human.active + cow.active ~
+ndvi <- occu( ~ people.active + cottontail.active ~
                 NDVI_2_4km, occu.cala, starts = c(-1, -1, -1, -1, -1))          
 occu.null.aicc - AICc(ndvi, k=2)  #worse than null 
 
-ndvi2 <- occu( ~ human.active + cow.active ~
+ndvi2 <- occu( ~ people.active + cottontail.active ~
                  NDVI_2_4km + NDVI_2_4km2,
                  occu.cala, starts = c(-1, -1, -1, -1, -1, -1))          
 occu.null.aicc - AICc(ndvi2, k=2)  #worse than null 
 
-bio.com2 <- occu( ~ human.active + cow.active 
+bio.com2 <- occu( ~ people.active + cottontail.active 
                   ~ as.factor(biotic_com_2), 
-                    occu.cala, starts = c(0, 0.5, 1, 0.1, 0.1))        
+                    occu.cala, starts = c(0, 0.5, 1, 0, 0))        
 occu.null.aicc - AICc(bio.com2, k=2) #worse than null 
 
 # none proceeds
 
 #### Vegetation Concealment Cover Hypothesis Group  ####
 
-vert.cover <- occu( ~ human.active + cow.active
-                    ~ vertical_cover, occu.cala)
+vert.cover <- occu( ~ people.active + cottontail.active
+                    ~ vertical_cover, occu.cala, starts = c(5, 0, -3, 0, 0))
 occu.null.aicc - AICc(vert.cover) #worse than null 
 
-vert.cover2 <- occu( ~ human.active + cow.active
+vert.cover2 <- occu( ~ people.active + cottontail.active
                      ~ vertical_cover + vertical_cover2, occu.cala)
 occu.null.aicc - AICc(vert.cover2) #worse than null 
 
-veg.cov <- occu( ~ human.active + cow.active
+veg.cov <- occu( ~ people.active + cottontail.active
                  ~ veg_cover, occu.cala)
 occu.null.aicc - AICc(veg.cov) #worse than null 
 
-veg.cov2 <- occu( ~ human.active + cow.active
+veg.cov2 <- occu( ~ people.active + cottontail.active
                   ~ veg_cover + veg_cover2, occu.cala)
 occu.null.aicc - AICc(veg.cov2) #worse than null 
 
@@ -541,24 +583,32 @@ occu.null.aicc - AICc(veg.cov2) #worse than null
 
 ##### Topography Hypothesis Group ####
 
-topo.pos <- occu( ~ human.active + cow.active ~ topo_pos, occu.cala)
-occu.null.aicc - AICc(topo.pos) #worse than null
+topo.pos <- occu( ~ people.active + cottontail.active ~ topo_pos, occu.cala,
+                    starts = c(5, -5, -3, 0, 0))
+occu.null.aicc - AICc(topo.pos) #better than null
+confint(topo.pos, type = "state", level = 0.85) #85% CI overlaps zero
 
-slope <- occu( ~ human.active + cow.active ~ slope, occu.cala)
-occu.null.aicc - AICc(slope)  #worse than null 
+slope <- occu( ~ people.active + cottontail.active ~ slope, occu.cala,
+                 starts = c(5, -5, -3, 0, 0))
+occu.null.aicc - AICc(slope)  #better than null 
+confint(slope, type = "state", level = 0.85) 
+#85% CI does not overlap zero but negative (no support for hypothesis)
 
-elev <- occu( ~ human.active + cow.active ~ elevation, occu.cala)
+elev <- occu( ~ people.active + cottontail.active ~ elevation, occu.cala)
 occu.null.aicc - AICc(elev)  #worse than null 
 
 # none proceeds
 
 ##### Coolness of Site Hypothesis Group ####
 
-aspect <- occu( ~ human.active + cow.active ~ aspect, occu.cala)
+aspect <- occu( ~ people.active + cottontail.active ~ aspect, occu.cala)
 occu.null.aicc - AICc(aspect) #worse than null 
 
-heat.load <- occu( ~  human.active + cow.active ~ heat_load, occu.cala)
-occu.null.aicc - AICc(heat.load) #worse than null 
+heat.load <- occu( ~  people.active + cottontail.active ~ heat_load, occu.cala,
+                      starts = c(5, 5, -3, 0, 0))
+occu.null.aicc - AICc(heat.load) #better than null 
+confint(heat.load, type = "state", level = 0.85) 
+#85% CI does not overlap zero but positive (no support for hypothesis)
 
 #none proceeds
 
@@ -569,8 +619,8 @@ occu.null.aicc - AICc(heat.load) #worse than null
 # Variables that proceed (0)
 
 # Detection only model 
-hab.mod <- occu( ~ human.active + cow.active ~ 1, occu.cala,
-                   starts = c(2, 0, -3, 0))
+hab.mod <- occu( ~ people.active + cottontail.active ~ 1, occu.cala,
+                   starts = c(5, -3, 0, 0))
 
 # The parameter estimates, standard errors, and 85% confidence intervals for
   #the best-supported model describing the probability of detection (p) and 

@@ -26,6 +26,7 @@ library(tidyverse)
 library(unmarked)
 library(MuMIn)
 library(xlsx)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR KIT FOX OCCUPANCY MODELS #
@@ -130,11 +131,13 @@ confint(temp.max, level=0.85, type="det")  #85% CI does not overlap zero
 
 # Temperature interactions
 
-water.dense <- occu( ~ max.temp * water_tank_density_1_9_km ~ 1, occu.vuma)       
-null.aicc - AICc(water.dense, k=2) 
-confint(water.dense, level=0.85, type="det")  #85% CI overlaps zero
+water.dense.temp <- occu( ~ max.temp * water_tank_density_1_9_km ~ 1, occu.vuma)
+null.aicc - AICc(water.dense.temp, k=2) 
+confint(water.dense.temp, level=0.85, type="det")  #85% CI overlaps zero
 
-canopy <- occu( ~ max.temp * canopy_cov ~ 1, occu.vuma)      
+canopy <- occu( ~ max.temp * canopy_cov ~ 1, occu.vuma, 
+                starts = c(-1, -5, 1, -5, 2)) 
+                #large SE for canopy cov and interaction
 null.aicc - AICc(canopy, k=2) #better than null
 confint(canopy, level=0.85, type="det") #85% CI overlaps zero
 
@@ -153,28 +156,40 @@ confint(wind, level=0.85, type="det") #85% CI does not overlap zero
 
 ##### Predator Activity Hypothesis Group ####
 
-coy.hours <- occu( ~ coyote.active ~ 1, occu.vuma, starts = c(0,0,0)) 
+coy.hours <- occu( ~ coyote.active ~ 1, occu.vuma, starts = c(-1,-5,-5),
+                     se=TRUE, control = list(maxit = 900000)) 
+#large SE for detection parameters 
 null.aicc - AICc(coy.hours,k=2) #worse than null
 
-coy.total <- occu( ~ coyote.count ~ 1, occu.vuma, starts = c(-1, -1, 0)) 
+coy.total <- occu( ~ coyote.count ~ 1, occu.vuma, starts = c(-1,-5,-5)) 
+#large SE for coyote count
 null.aicc - AICc(coy.total,k=2) #worse than null
 
-coy.bob.hours <- occu( ~ coy.bob.active ~ 1, occu.vuma, starts = c(-1, 0, 0)) 
+coy.bob.hours <- occu( ~ coy.bob.active ~ 1, occu.vuma, starts = c(-1, -5, -5),
+                         se=TRUE, control = list(maxit = 900000)) 
+#NAs for SEs for detection parameters 
 null.aicc - AICc(coy.bob.hours,k=2) #worse than null
 
-coy.bob.total <- occu( ~ coy.bob.count ~ 1, occu.vuma) 
+coy.bob.total <- occu( ~ coy.bob.count ~ 1, occu.vuma, starts = c(-1, -5, -5),
+                       se=TRUE, control = list(maxit = 900000))
+#large SE for detection parameters 
 null.aicc - AICc(coy.bob.total,k=2) #worse than null
 
-bob.hours <- occu( ~ bobcat.active ~ 1, occu.vuma)        
+bob.hours <- occu( ~ bobcat.active ~ 1, occu.vuma,
+                   se=TRUE, control = list(maxit = 900000))     
+#large SE for detection parameters 
 null.aicc - AICc(bob.hours,k=2)  #worse than null 
 
-bob.total <- occu( ~ bobcat.count ~ 1, occu.vuma)        
+bob.total <- occu( ~ bobcat.count ~ 1, occu.vuma, starts = c(-1, -5, -5),
+                   se=TRUE, control = list(maxit = 900000))   
+#large SE for detection parameters 
 null.aicc - AICc(bob.total,k=2) #worse than null
 
 # Predator interactions
 
 bob.hours.water.dense <- occu( ~ coy.bob.count * water_tank_density_1_9_km
-                               ~ 1, occu.vuma, starts = c(-1, 0, 0, 0, 0)) 
+                               ~ 1, occu.vuma, starts = c(-1, -5, -5, 0, -1)) 
+#large SE for detection parameters 
 null.aicc - AICc(bob.hours.water.dense,k=2) #worse than null
 
 # none proceed
@@ -200,10 +215,12 @@ lagomorph.hours <- occu( ~ lagomorph.active
                          ~ 1, occu.vuma, starts = c(-1, -1, -1))     
 null.aicc - AICc(lagomorph.hours,k=2) #worse than null
 
-rodent.total <- occu( ~ rodent.count ~ 1, occu.vuma,  starts = c(-1, -1, 0))
+rodent.total <- occu( ~ rodent.count ~ 1, occu.vuma,  starts = c(-1, -2, -3))
+#large SE for rodent count
 null.aicc - AICc(rodent.total,k=2) #worse than null 
 
-rodent.hours <- occu( ~ rodent.active ~ 1, occu.vuma, starts = c(-1, -1, -1))     
+rodent.hours <- occu( ~ rodent.active ~ 1, occu.vuma, starts = c(-1, -2, -1)) 
+#large SE for rodent hours
 null.aicc - AICc(rodent.hours,k=2) #worse than null
 
 lago.rodent.total <- occu( ~ lago.rodent.count 
@@ -215,11 +232,12 @@ lago.rodent.hours <- occu( ~ lago.rodent.active
 null.aicc - AICc(lago.rodent.hours,k=2) #worse than null
 
 cottontail.total <- occu( ~ cottontail.count
-                          ~ 1, occu.vuma, starts = c(-1, 0, 0))
+                          ~ 1, occu.vuma, starts = c(-1, -5, -5))
 null.aicc - AICc(cottontail.total,k=2) #worse than null
 
 cottontail.hours <- occu( ~ cottontail.active 
                           ~ 1, occu.vuma, starts = c(-1, -1, -1))     
+#large SE for detection parameters 
 null.aicc - AICc(cottontail.hours,k=2) #worse than null
 
 jackrabbit.total <- occu( ~ jackrabbit.count 
@@ -234,17 +252,20 @@ null.aicc - AICc(jackrabbit.hours,k=2) #worse than null
 
 ##### Human Activity Hypothesis Group#####
 
-vehicle.total <- occu( ~ vehicle.count ~ 1, occu.vuma, starts = c(-1, 0, 0))
+vehicle.total <- occu( ~ vehicle.count ~ 1, occu.vuma, starts = c(-1, -3, -5))
+#large SE for vehicle count
 null.aicc - AICc(vehicle.total,k=2) # worse than null
 
 vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.vuma, starts = c(-1, -1, -1))
+#large SE for vehicle hours
 null.aicc - AICc(vehicle.hours,k=2) # worse than null
 
 human.hours <- occu( ~ human.active ~ 1, occu.vuma, starts = c(-1, 0, 0)) 
 null.aicc - AICc(human.hours,k=2) #better than null
 confint(human.hours, level=0.85, type="det") # 85% CI overlaps zero
 
-people.hours <- occu( ~ people.active ~ 1, occu.vuma, starts = c(-1, 0, 0)) 
+people.hours <- occu( ~ people.active ~ 1, occu.vuma, starts = c(-1, -5, -10)) 
+#large SE for detection parameters 
 null.aicc - AICc(people.hours,k=2) #better than null
 confint(people.hours, level=0.85, type="det") # 85% CI overlaps zero
 
@@ -261,7 +282,8 @@ null.aicc - AICc(wood, k=2) #better than null
 confint(wood, level=0.85, type="det") # 85% CI does not overlap zero 
 
 bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.vuma, 
-                   starts = c(0, -4, -10))        
+                   starts = c(-1, -2, -10))       
+#large SE for biotic comm
 null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="det") # 85% CI overlaps zero 
 
@@ -366,17 +388,20 @@ mod20 <- occu( ~ wind + NDVI_1_9km ~ 1, occu.vuma)
 mod21 <- occu( ~ detection_angle + wind ~ 1, occu.vuma)
 
 # Model selection
-top_mods <- model.sel(
+cand.models <- list(
   mod1, mod2, mod3, mod4, mod5, mod6, mod7,
   mod8, mod9, mod10, mod11, mod12, mod13, mod14, mod15, 
   mod16, mod17, mod18, mod19, mod20, mod21, vuma.null
 )
 
-# Candidate detection models are found in Table S2.5.
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "mod11", "mod12", "mod13", "mod14", "mod15", 
+              "mod16", "mod17", "mod18", "mod19", "mod20", "mod21", "vuma.null")
 
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Kit Fox Base Models.xlsx", 
-       #  sheetName="Detection Models", append=T)  
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
+
+# Candidate detection models are found in Table S2.5.
 
 # Top model diagnostics
 
@@ -443,7 +468,8 @@ occu.null.aicc - AICc(lagomorph, k=2) #better than null
 confint(lagomorph, level=0.85, type="state")  # 85% CI does not overlap zero
 
 rodent <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
-                ~ rodent_count_avg, occu.vuma)
+                ~ rodent_count_avg, occu.vuma, starts = c(-1, -3, -5, -2, -2))
+#large SE for rodent count
 occu.null.aicc - AICc(rodent, k=2) #worse than null
 
 jackrabbit <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
@@ -460,7 +486,8 @@ occu.null.aicc - AICc(cottontail, k=2) #worse than null
 #### Livestock Activity Hypothesis Group####
 
 sheep <- occu( ~ as.factor(cam_moved) + NDVI_1_9km 
-               ~ sheep_count_avg, occu.vuma, starts = c(-1, -1, -1, -1, -1))
+               ~ sheep_count_avg, occu.vuma, starts = c(-1, 2, -5, -1, -1))
+#large SE for sheep count
 occu.null.aicc - AICc(sheep, k=2) #better than null
 confint(sheep, level=0.85, type="state") # 85% CI overlaps zero
 
@@ -490,7 +517,8 @@ wood <- occu( ~ as.factor(cam_moved) + NDVI_1_9km
 occu.null.aicc - AICc(wood, k=2)  #worse than null
 
 bio.com <- occu( ~  as.factor(cam_moved) + NDVI_1_9km 
-                 ~  as.factor(biotic_com_2), occu.vuma, starts = c(0,0,0,1,0.5))        
+                 ~  as.factor(biotic_com_2), occu.vuma, 
+                    starts = c(0,-5,-5,-2,-2)) #large SE for biotic comm
 occu.null.aicc - AICc(bio.com)  #better than null
 confint(bio.com, level=0.85, type="state") # 85% CI overlaps zero
 
@@ -575,15 +603,17 @@ mod5 <- occu( ~  as.factor(cam_moved) + NDVI_1_9km
 mod6 <- occu( ~  as.factor(cam_moved) + NDVI_1_9km 
               ~ jackrabbit_count_avg + veg_cover, occu.vuma)
 
-# Combine models in model selection table
-top_mods <- model.sel(
-  mod1, mod2, mod3, mod4, mod5, mod6, det.mod)
+# Model selection
+cand.models <- list(
+  mod1, mod2, mod3, mod4, mod5, mod6, det.mod
+)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-  #write.xlsx(top_mods, file="Kit Fox Base Models.xlsx", 
-        #  sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics
 

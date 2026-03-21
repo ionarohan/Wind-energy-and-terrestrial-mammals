@@ -21,21 +21,6 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
-# Load packages 
-#library(dplyr)
-#library(lubridate)
-#library(AICcmodavg) 
-#library(MuMIn)
-#library(ggpubr)
-#library(unmarked)
-#library(lmtest)
-#library(xlsx)
-#library(ggplot2)
-#library(tidyverse)
-#library(scales)
-#library(patchwork)
-#library(cowplot)
-
 # Input site-level covariates
 site.covs <- read.csv("site_covs.csv", nrows = 102, header=TRUE)
 

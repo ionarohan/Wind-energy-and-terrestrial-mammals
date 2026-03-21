@@ -11,11 +11,11 @@
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-  #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 19.
+#should need to change for the script to run (assuming packages are installed) 
+#is the homewd directory on line 19.
 
 #Set home working directory
-  #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
+#e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
 homewd = "<insert your folder here and end with a forward slash>"
 
 #Set wd to data folder on your local computer 
@@ -26,6 +26,7 @@ library(tidyverse)
 library(unmarked)
 library(MuMIn)
 library(xlsx)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR MULE DEER OCCUPANCY MODELS #
@@ -66,12 +67,12 @@ backTransform(odhe.null['state'])
 ## Mule deer detection hypotheses are listed in Table S2.1.
 
 ## Table S2.3 lists which detection hypothesis groups proceeded (i.e. performed 
-  # better than the null detection model p(.), did not have uninformative 
-  # parameters, and supported our original hypothesis).
+# better than the null detection model p(.), did not have uninformative 
+# parameters, and supported our original hypothesis).
 
 ## Candidate detection models are found in Table S2.5.
-  # Models were limited to 4 parameters total and were tested with no variables 
-  # on the probability of habitat selection (ψ(.)).
+# Models were limited to 4 parameters total and were tested with no variables 
+# on the probability of habitat selection (ψ(.)).
 
 ##### Water Hypothesis Group ####
 
@@ -87,7 +88,7 @@ null.aicc - AICc(water.tank.dense) #worse than null
 
 # Daily precipitation 
 precip.cat <- occu( ~ as.factor(precip.cat) ~ 1, occu.odhe, 
-                      starts = c(2, 0, -3))
+                    starts = c(2, 0, -3))
 null.aicc - AICc(precip.cat)  #worse than null 
 
 precip.cm <- occu( ~ precip.cm ~ 1, occu.odhe, starts = c(2, 0, -3))
@@ -95,7 +96,7 @@ null.aicc - AICc(precip.cm)  #worse than null
 
 # Long-term precipitation
 
-days.since.rain <- occu( ~ days.since.rain ~ 1, occu.odhe, starts = c(2, 0, -3))    
+days.since.rain <- occu( ~ days.since.rain ~ 1, occu.odhe, starts = c(2, 0, -3))
 null.aicc - AICc(days.since.rain, k=2)  #worse than null 
 
 rain.week <- occu( ~ rain.week ~ 1, occu.odhe, starts = c(2, 0, -3))    
@@ -120,11 +121,11 @@ null.aicc - AICc(temp.max, k=2) #worse than null
 
 # Temperature interactions 
 
-temp.water.dense <- occu( ~ max.temp * water_tank_density_1_9_km ~ 1, occu.odhe)   
+temp.water.dense <- occu( ~ max.temp * water_tank_density_1_9_km ~ 1, occu.odhe)
 null.aicc - AICc(temp.water.dense , k=2)  #worse than null 
 
 temp.canopy <- occu( ~ max.temp * canopy_cov ~ 1, occu.odhe,
-                       starts = c(-1, -1, 0, -1, -1))       
+                     starts = c(-1, -1, 0, -1, -1))       
 null.aicc - AICc(temp.canopy, k=2) #better than null 
 confint(temp.canopy, level=0.85, type="det") # 85% CI overlaps zero
 
@@ -182,7 +183,8 @@ confint(stock.hours, level=0.85, type="det") #85% CI does not overlap zero
 
 # Livestock interactions
 
-coy.cow <- occu( ~ coyote.count * livestock.count ~ 1, occu.odhe)     
+coy.cow <- occu( ~ coyote.count * livestock.count ~ 1, occu.odhe, 
+                   starts = c(0, -3, -2, -2, -5))  #large SEs   
 null.aicc - AICc(coy.total,k=2) #worse than null
 
 cow.water.dense <- occu( ~ livestock.count * water_tank_density_1_9_km  
@@ -266,11 +268,11 @@ null.aicc - AICc(cam.moved, k=2) #worse than null
 #################################################
 
 # Variables that proceed (5)
-  # NDVI
-  # max trigger dist
-  # livestock count
-  # people active
-  # rain month
+# NDVI
+# max trigger dist
+# livestock count
+# people active
+# rain month
 
 # Check correlations between detection variables 
 
@@ -299,53 +301,59 @@ obs_cor <-cor(data.frame(
   #write.xlsx(obs_cor, file="Correlations mule deer.xlsx") 
 
 # Null model
-mod_null <- occu( ~ 1 ~ 1, occu.odhe)
+mod_null <- occu( ~ 1 ~ 1, occu.odhe, starts = c(2, -3)) 
 
 # Single variable models 
 mod1 <- occu( ~ max_trig_dist ~ 1, occu.odhe)
-mod2 <- occu( ~ NDVI_1_9km ~ 1, occu.odhe)
-mod3 <- occu( ~ people.active ~ 1, occu.odhe)
-mod4 <- occu( ~ livestock.count ~ 1, occu.odhe)
+mod2 <- occu( ~ NDVI_1_9km ~ 1, occu.odhe, starts = c(2, -3, 1))
+mod3 <- occu( ~ people.active ~ 1, occu.odhe) 
+mod4 <- occu( ~ livestock.count ~ 1, occu.odhe, starts = c(2, -3, -1)) 
 mod5 <- occu( ~ rain.month ~ 1, occu.odhe)
 
 # 2 variable models 
 mod6 <- occu( ~ max_trig_dist + NDVI_1_9km 
-              ~ 1, occu.odhe, starts = c(2, 5, 0, -3))
+              ~ 1, occu.odhe, starts = c(1, -2, 0, 1))
 mod7 <- occu( ~ max_trig_dist + people.active ~ 1, occu.odhe)
-mod8 <- occu( ~ max_trig_dist + livestock.count ~ 1, occu.odhe)
-mod9 <- occu( ~ max_trig_dist + rain.month ~ 1, occu.odhe)
+mod8 <- occu( ~ max_trig_dist + livestock.count 
+              ~ 1, occu.odhe, starts = c(0, -2, -1, -2)) 
+mod9 <- occu( ~ max_trig_dist + rain.month 
+              ~ 1, occu.odhe, starts = c(1, -2, 0, 1)) 
 mod10 <- occu( ~ NDVI_1_9km + people.active ~ 1, occu.odhe)
-mod11 <- occu( ~ NDVI_1_9km + livestock.count ~ 1, occu.odhe)
+mod11 <- occu( ~ NDVI_1_9km + livestock.count 
+               ~ 1, occu.odhe, starts = c(1, -2, 0, -1)) 
 mod12 <- occu( ~ NDVI_1_9km + rain.month ~ 1, occu.odhe)
 mod13 <- occu( ~ people.active + livestock.count ~ 1, occu.odhe)
 mod14 <- occu( ~ people.active + rain.month ~ 1, occu.odhe)
 mod15 <- occu( ~ livestock.count + rain.month ~ 1, occu.odhe)
 
 # Model selection
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
-                      mod10, mod11, mod12, mod13, mod14, mod15, mod_null)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, mod11, mod12, mod13, mod14, mod15, mod_null)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "mod11", "mod12", "mod13", "mod14", "mod15", 
+              "mod_null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
 
-# Run this code to see candidate detection models 
-  #write.xlsx(top_mods, file="Mule Deer Base Models.xlsx", 
-         #  sheetName="Detection Models", append=T)  
-
 # Top model diagnostics
 
-summary(mod6)
-null.aicc - AICc(mod6)
+summary(mod8)
+null.aicc - AICc(mod8)
 
 # Calculate the 85% confidence intervals for variables 
-confint(mod6, type = "det", level = 0.85)    
+confint(mod8, type = "det", level = 0.85)    
 #CIs for detection variables - none overlap zero
 
-confint(mod6, type = "state", level = 0.85)  
+confint(mod8, type = "state", level = 0.85)  
 #CIs for occupancy intercept - overlaps zero
 
 # Calculate multicollinearity
 
-unmarked::vif(mod6, type = "det") # no colliniarity - all below 2
+unmarked::vif(mod8, type = "det") # no colliniarity - all below 2
 
 #################################################
 # CREATE THE HABITAT SELECTION (OCCUPANCY) MODEL#
@@ -354,22 +362,22 @@ unmarked::vif(mod6, type = "det") # no colliniarity - all below 2
 ## Mule deer habitat selection hypotheses are listed in Table S2.2.
 
 ## Table S2.4 lists which occupancy hypothesis groups proceeded (i.e. performed 
-  # better than the null occupancy model ψ(.), did not have uninformative 
-  # parameters, and supported our original hypothesis).
+# better than the null occupancy model ψ(.), did not have uninformative 
+# parameters, and supported our original hypothesis).
 
 ## Candidate habitat selection (occupancy) models are found in Table S2.6.
-  # Models were limited to 6 parameters and were derived from the best-supported
-  # detection model (mod6 above).
+# Models were limited to 6 parameters and were derived from the best-supported
+# detection model (mod6 above).
 
-occu.null.aicc <- AICc(mod6)
+occu.null.aicc <- AICc(mod8)
 
 #### Water Hypothesis Group ####
 
-water.dist <- occu( ~ max_trig_dist + NDVI_1_9km 
-                         ~ dist_water_tank, occu.odhe)
+water.dist <- occu( ~ max_trig_dist + livestock.count 
+                    ~ dist_water_tank, occu.odhe)
 occu.null.aicc - AICc(water.dist) #worse than null 
 
-water.tank.dense <- occu( ~ max_trig_dist + NDVI_1_9km 
+water.tank.dense <- occu( ~ max_trig_dist + livestock.count 
                           ~ water_tank_density_1_9_km, occu.odhe)       
 occu.null.aicc - AICc(water.tank.dense) #worse than null 
 
@@ -377,11 +385,11 @@ occu.null.aicc - AICc(water.tank.dense) #worse than null
 
 #### Predator Activity Hypothesis Group####
 
-bobcat.coyote <- occu( ~ max_trig_dist + NDVI_1_9km
-                       ~ pred_count_avg, occu.odhe)
+bobcat.coyote <- occu( ~ max_trig_dist + livestock.count
+                       ~ pred_count_avg, occu.odhe, starts = c(1, 1, -3, 0, -2))
 occu.null.aicc - AICc(bobcat.coyote, k=2) #worse than null 
 
-coyote <- occu( ~ max_trig_dist + NDVI_1_9km 
+coyote <- occu( ~ max_trig_dist + livestock.count 
                 ~ coy_count_avg, occu.odhe)
 occu.null.aicc - AICc(coyote, k=2) #worse than null 
 
@@ -389,12 +397,12 @@ occu.null.aicc - AICc(coyote, k=2) #worse than null
 
 #### Livestock Activity Hypothesis Group####
 
-stock <- occu( ~ max_trig_dist + NDVI_1_9km 
+stock <- occu( ~ max_trig_dist + livestock.count 
                ~ livestock_count_avg, occu.odhe)
 occu.null.aicc - AICc(stock, k=2) #better than null
 confint(stock, type = "state", level = 0.85) #85% CI does not overlap zero
 
-cow <- occu( ~ max_trig_dist + NDVI_1_9km 
+cow <- occu( ~ max_trig_dist + livestock.count 
              ~ cow_count_avg, occu.odhe)
 occu.null.aicc - AICc(cow, k=2) #better than null
 confint(cow, type = "state", level = 0.85) #85% CI does not overlap zero
@@ -403,32 +411,32 @@ confint(cow, type = "state", level = 0.85) #85% CI does not overlap zero
 
 #### Biotic Community Type Hypothesis Group ####
 
-trees <- occu( ~  max_trig_dist + NDVI_1_9km 
+trees <- occu( ~  max_trig_dist + livestock.count 
                ~  tree_density_5_70, occu.odhe)
 occu.null.aicc - AICc(trees) #better than null
 confint(trees, level=0.85, type="state") #85% CI does not overlap zero
 
-ndvi <- occu( ~ max_trig_dist + NDVI_1_9km 
+ndvi <- occu( ~ max_trig_dist + livestock.count 
               ~ NDVI_1_9km, occu.odhe)
 occu.null.aicc - AICc(ndvi) #better than null
 confint(ndvi, level=0.85, type="state") #85% CI does not overlap zero
 
-shrubland <- occu( ~ max_trig_dist + NDVI_1_9km 
+shrubland <- occu( ~ max_trig_dist + livestock.count 
                    ~ shrub_yucca_density, occu.odhe)
 occu.null.aicc - AICc(shrubland) #better than null
 confint(shrubland, level=0.85, type="state") #85% CI does not overlap zero
 
-grassland <- occu( ~ max_trig_dist + NDVI_1_9km 
+grassland <- occu( ~ max_trig_dist + livestock.count 
                    ~ herbaceous_cov, occu.odhe)
 occu.null.aicc - AICc(grassland) #better than null
 confint(grassland, level=0.85, type="state") #85% CI does not overlap zero
 
-wood <- occu( ~ max_trig_dist + NDVI_1_9km 
+wood <- occu( ~ max_trig_dist + livestock.count 
               ~ woodland_percent_1_9km, occu.odhe)          
 occu.null.aicc - AICc(wood, k=2) #better than null
 confint(wood, level=0.85, type="state") #85% CI does not overlap zero
 
-bio.com <- occu( ~ max_trig_dist + NDVI_1_9km
+bio.com <- occu( ~ max_trig_dist + livestock.count
                  ~ as.factor(biotic_com_2), occu.odhe)          
 occu.null.aicc - AICc(bio.com, k=2) #better than null
 confint(bio.com, level=0.85, type="state") #85% CI does not overlap zero
@@ -437,11 +445,11 @@ confint(bio.com, level=0.85, type="state") #85% CI does not overlap zero
 
 #### Vegetation Concealment Cover Hypothesis Group  ####
 
-vert.cover <- occu( ~ max_trig_dist + NDVI_1_9km 
+vert.cover <- occu( ~ max_trig_dist + livestock.count 
                     ~ vertical_cover, occu.odhe)
 occu.null.aicc - AICc(vert.cover)  #worse than null 
 
-veg.cover <- occu( ~ max_trig_dist + NDVI_1_9km 
+veg.cover <- occu( ~ max_trig_dist + livestock.count 
                    ~ veg_cover, occu.odhe)
 occu.null.aicc - AICc(veg.cover) #better than null
 confint(veg.cover, type = "state", level = 0.85) #85% CI does not overlap zero
@@ -450,16 +458,16 @@ confint(veg.cover, type = "state", level = 0.85) #85% CI does not overlap zero
 
 ##### Topography Hypothesis Group ####
 
-topo.pos <- occu( ~ max_trig_dist + NDVI_1_9km 
-                  ~ topo_pos, occu.odhe)
+topo.pos <- occu( ~ max_trig_dist + livestock.count 
+                  ~ topo_pos, occu.odhe, starts = c(1, 1, -3, 0, -2))
 occu.null.aicc - AICc(topo.pos) #worse than null 
 
-slope <- occu( ~ max_trig_dist + NDVI_1_9km 
-                  ~  slope, occu.odhe)
+slope <- occu( ~ max_trig_dist + livestock.count 
+               ~  slope, occu.odhe)
 occu.null.aicc - AICc(slope) #better than null
 confint(slope, level=0.85, type="state") #85% CI does not overlap zero
 
-elev <- occu( ~ max_trig_dist + NDVI_1_9km 
+elev <- occu( ~ max_trig_dist + livestock.count 
               ~ elevation, occu.odhe)
 occu.null.aicc - AICc(elev)  #worse than null 
 
@@ -467,12 +475,12 @@ occu.null.aicc - AICc(elev)  #worse than null
 
 ##### Coolness of Site Hypothesis Group ####
 
-aspect <- occu( ~ max_trig_dist + NDVI_1_9km 
+aspect <- occu( ~ max_trig_dist + livestock.count 
                 ~ aspect, occu.odhe)
 occu.null.aicc - AICc(aspect) #worse than null 
 
-heat.load <- occu( ~ max_trig_dist + NDVI_1_9km 
-                   ~  heat_load, occu.odhe)
+heat.load <- occu( ~ max_trig_dist + livestock.count 
+                   ~  heat_load, occu.odhe, starts = c(1, 1, -3, 0, -2))
 occu.null.aicc - AICc(heat.load) #worse than null 
 
 #none proceed
@@ -482,10 +490,10 @@ occu.null.aicc - AICc(heat.load) #worse than null
 #################################################
 
 # Variables that proceed (4)
-  # livestock_count_avg
-  # shrub_yucca_density
-  # veg_cover
-  # slope
+# livestock_count_avg
+# shrub_yucca_density
+# veg_cover
+# slope
 
 # Check correlations between occupancy variables 
 site.covs.cor <- site.covs %>% 
@@ -496,37 +504,47 @@ cor_site_covs <- cor(site.covs.cor, method='spearman')
 # none correlated above |0.7|
 
 # Detection only model 
-det.mod <- occu( ~ max_trig_dist + NDVI_1_9km  ~ 1, occu.odhe)
+det.mod <- occu( ~ max_trig_dist + livestock.count  
+                 ~ 1, occu.odhe, starts = c(0, -2, -1, -2))
 
 # 1-variable occupancy models
-mod1 <- occu( ~ max_trig_dist + NDVI_1_9km ~ livestock_count_avg, occu.odhe)
-mod2 <- occu( ~ max_trig_dist + NDVI_1_9km ~ slope, occu.odhe)
-mod3 <- occu( ~ max_trig_dist + NDVI_1_9km ~ shrub_yucca_density, occu.odhe)
-mod4 <- occu( ~ max_trig_dist + NDVI_1_9km ~ veg_cover, occu.odhe)
+mod1 <- occu( ~ max_trig_dist + livestock.count ~ livestock_count_avg, 
+              occu.odhe)
+mod2 <- occu( ~ max_trig_dist + livestock.count ~ slope, occu.odhe)
+mod3 <- occu( ~ max_trig_dist + livestock.count ~ shrub_yucca_density, 
+              occu.odhe)
+mod4 <- occu( ~ max_trig_dist + livestock.count ~ veg_cover, occu.odhe)
 
 # 2-variable occupancy models
-mod5 <- occu( ~ max_trig_dist + NDVI_1_9km 
+mod5 <- occu( ~ max_trig_dist + livestock.count 
               ~ livestock_count_avg + slope, occu.odhe)
-mod6 <- occu( ~ max_trig_dist + NDVI_1_9km 
+mod6 <- occu( ~ max_trig_dist + livestock.count 
               ~ livestock_count_avg + shrub_yucca_density, occu.odhe)
-mod7 <- occu( ~ max_trig_dist + NDVI_1_9km 
+mod7 <- occu( ~ max_trig_dist + livestock.count 
               ~ livestock_count_avg + veg_cover, occu.odhe)
-mod8 <- occu( ~ max_trig_dist + NDVI_1_9km 
+mod8 <- occu( ~ max_trig_dist + livestock.count 
               ~ slope + shrub_yucca_density, occu.odhe)
-mod9 <- occu( ~ max_trig_dist + NDVI_1_9km 
+mod9 <- occu( ~ max_trig_dist + livestock.count 
               ~ slope + veg_cover, occu.odhe)
-mod10 <- occu( ~ max_trig_dist + NDVI_1_9km 
-               ~ shrub_yucca_density + veg_cover, occu.odhe)
+mod10 <- occu( ~ max_trig_dist + livestock.count 
+               ~ shrub_yucca_density + veg_cover, occu.odhe,
+               starts = c(0, -2, -5, -2, -1, -2))
 
 # Combine models in model selection table
 top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9,
                       mod10, det.mod)
 
-# Candidate occupancy models are found in Table S2.6.
+# Model selection
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, det.mod)
 
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Mule Deer Base Models.xlsx", 
-        #   sheetName="Occupancy Models", append=T)  
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
+
+# Candidate occupancy models are found in Table S2.6.
 
 # Top Model Diagnostics 
 
@@ -534,8 +552,8 @@ AICc(det.mod) - AICc(mod10)
 summary(mod10)
 
 # The parameter estimates, standard errors, and 85% confidence intervals for
-  #the best-supported model describing the probability of detection (p) and 
-  #habitat selection (ψ) of mule deer are listed in Table S2.7.
+#the best-supported model describing the probability of detection (p) and 
+#habitat selection (ψ) of mule deer are listed in Table S2.7.
 
 # Calculate the 85% confidence intervals for variables 
 confint(mod10, type = "det", level = 0.85)   
@@ -554,42 +572,47 @@ unmarked::vif(mod10, type = "state") # no colliniarity - all below 2
 backTransform(linearComb(mod10,                           
                          coefficients= c(1,0,0),  
                          type = 'det'))     
-#0.0642 or 6.4%
+#0.0519 or 5.2%
 
 # Calculate the overall detection probability if K = 29
-1-(1-0.0642)^29
+1-(1-0.0519)^29
 
-# 85% probability of detecting a mule deer at least once given the minimum 
-  #sampling period length at a site
+# 79% probability of detecting a mule deer at least once given the minimum 
+#sampling period length at a site
 
 # Calculate the overall detection probability if K = 38 
-1-(1-0.0642)^38
+1-(1-0.0519)^38
 
-# 92% probability of detecting a mule deer at least once given the average
-  #sampling period length at a site
+# 87% probability of detecting a mule deer at least once given the average
+#sampling period length at a site
 
 # Calculate the occupancy probability
 
 backTransform(linearComb(mod10,                
                          coefficients=c(1,0,0),   
                          type = 'state')) 
-#0.748 OR 74.8%
+#0.745 OR 74.5%
 
 
-# Predict daily detection probability for survey sites 
+#Predict daily detection probability for survey sites 
 
-pred_det <- predict(mod10,          
-                      type = "det",                 
-                      newdata = occu.odhe@siteCovs)[c("Predicted",
-                                                      "SE",
-                                                      "lower",
-                                                      "upper")]
+p_full <- predict(mod10, type = "det")
 
-pred_det_df <- data.frame(Predicted = pred_det$Predicted,
-                            StandardError = pred_det$SE,
-                            lower = pred_det$lower,
-                            upper = pred_det$upper,
-                            site.covs)
+# Get number of sites and occasions
+n_sites <- numSites(occu.odhe)
+n_occasions <- ncol(getY(occu.odhe))
+site_index <- rep(1:n_sites, each = n_occasions)
+
+# Add site info and summarize
+p_site <- p_full %>%
+  mutate(site = site_index) %>%
+  group_by(site) %>%
+  summarise(
+    mean.p = mean(Predicted, na.rm = TRUE),
+    mean.SE = sqrt(sum(SE^2, na.rm = TRUE)) / n(),
+    lower85 = mean.p - qnorm(0.925) * mean.SE,
+    upper85 = mean.p + qnorm(0.925) * mean.SE
+  )
 
 # Predict occupancy probability for survey sites 
 

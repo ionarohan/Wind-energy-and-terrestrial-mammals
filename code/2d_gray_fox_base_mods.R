@@ -26,6 +26,7 @@ library(tidyverse)
 library(unmarked)
 library(MuMIn)
 library(xlsx)
+library(AICcmodavg)
 
 ###########################################################
 # SETUP CODE FOR GRAY FOX OCCUPANCY MODELS #
@@ -166,26 +167,28 @@ coy.bob.total <- occu( ~ coy.bob.count ~ 1, occu.urci, starts = c(-1, -1, 0))
 null.aicc - AICc(coy.bob.total,k=2) #better than null
 confint(coy.bob.total, level=0.85, type="det") #85% CI overlaps zero
 
-bob.hours <- occu( ~ bobcat.active ~ 1, occu.urci, starts = c(-1, 0, 0))      
+bob.hours <- occu( ~ bobcat.active ~ 1, occu.urci, starts = c(-1, -2, 0))     
+#large SE for bobcat active
 null.aicc - AICc(bob.hours,k=2)  #worse than null
 
-bob.total <- occu( ~ bobcat.count ~ 1, occu.urci, starts = c(-1, -1, 0))      
+bob.total <- occu( ~ bobcat.count ~ 1, occu.urci, starts = c(-1, -2, -2))  
+#large SE for bobcat count
 null.aicc - AICc(bob.total,k=2)  #worse than null
 
 # Water sources and predator presence interactions (use best univariates)
 coy.bob.total.water <- occu( ~ coy.bob.count * dist_water_tank ~ 1, occu.urci)
 null.aicc - AICc(coy.bob.total.water) #better than null
-
 confint(coy.bob.total.water, level=0.85, type="det") #85% CI overlaps zero
 
 # none proceed
 
 ##### Livestock Activity Hypothesis Group ####
 
-sheep.hours <- occu( ~ sheep.active ~ 1, occu.urci, starts = c(-1, 0, 0))       
+sheep.hours <- occu( ~ sheep.active ~ 1, occu.urci, starts = c(-1, 0, 0))  
 null.aicc - AICc(sheep.hours, k=2) #worse than null
 
-sheep.total <- occu( ~ sheep.count ~ 1, occu.urci, starts = c(-1, -1, 0))       
+sheep.total <- occu( ~ sheep.count ~ 1, occu.urci, starts = c(-1, -2, -1))   
+#large SE for sheep count
 null.aicc - AICc(sheep.total,k=2) #worse than null
 
 # none proceed
@@ -199,10 +202,12 @@ lagomorph.hours <- occu( ~ lagomorph.active ~ 1, occu.urci,
                            starts = c(-1, -1, -1))     
 null.aicc - AICc(lagomorph.hours,k=2) #worse than null
 
-rodent.total <- occu( ~ rodent.count ~ 1, occu.urci, starts = c(-1, 0, 0))
+rodent.total <- occu( ~ rodent.count ~ 1, occu.urci, starts = c(-1, -2, -5))
+#large SE for rodent count
 null.aicc - AICc(rodent.total,k=2) #worse than null
 
-rodent.hours <- occu( ~ rodent.active ~ 1, occu.urci, starts = c(-1, -1, -1))     
+rodent.hours <- occu( ~ rodent.active ~ 1, occu.urci, starts = c(-1, -2, -1))   
+#large SE for rodent hours
 null.aicc - AICc(rodent.hours,k=2) #worse than null
 
 lago.rodent.total <- occu( ~ lago.rodent.count ~ 1, occu.urci, 
@@ -236,7 +241,7 @@ null.aicc - AICc(jackrabbit.hours,k=2) #worse than null
 vehicle.total <- occu( ~ vehicle.count ~ 1, occu.urci, starts = c(-1, 0, 0))
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.urci, starts = c(-1, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.urci, starts = c(-1, -1, -1))
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
 human.hours <- occu( ~ human.active ~ 1, occu.urci, starts = c(-1, 0, 0)) 
@@ -306,13 +311,14 @@ urci.null <- occu( ~ 1 ~ 1, occu.urci, linkPsi="logit", starts = c(-1, -1))
 mod1 <- occu( ~ as.factor(cam_moved) ~ 1, occu.urci, starts = c(-1, 0, 0))   
 
 # Model selection
-top_mods <- model.sel(mod1, urci.null)
+cand.models <- list(mod1, urci.null)
+
+modnames <- c("mod1", "urci.null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file = "Gray Fox Base Models.xlsx", 
-          # sheetName="Detection Models", append=T)  
 
 # Top model diagnostics
 
@@ -393,22 +399,22 @@ occu.null.aicc - AICc(cottontail.count.avg, k=2)  #worse than null
 #### Livestock Activity Hypothesis Group ####
 
 sheep.count.avg <- occu( ~  as.factor(cam_moved)
-                         ~  sheep_count_avg, occu.urci)
+                         ~  sheep_count_avg, occu.urci, 
+                            starts = c(-2, -5, -2, -2)) 
+                            # large SE for sheep count
 occu.null.aicc - AICc(sheep.count.avg, k=2) #worse than null
 
 # none proceed 
 
 #### Biotic Community Type Hypothesis Group ####
 
-woodland <- occu( ~  as.factor(cam_moved)
-                  ~  tree_density_5_70, occu.urci)
-occu.null.aicc - AICc(woodland) #better than null
-confint(woodland, level=0.85, type="state") # 85% CI does not overlap zero
+tree <- occu( ~  as.factor(cam_moved) ~  tree_density_5_70, occu.urci)
+occu.null.aicc - AICc(tree) #better than null
+confint(tree, level=0.85, type="state") # 85% CI does not overlap zero
 
-woodland2 <- occu( ~ as.factor(cam_moved)
-                   ~ NDVI_1_5km, occu.urci)
-occu.null.aicc - AICc(woodland2) #better than null
-confint(woodland2, level=0.85, type="state") # 85% CI does not overlap zero
+ndvi <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km, occu.urci)
+occu.null.aicc - AICc(ndvi ) #better than null
+confint(ndvi , level=0.85, type="state") # 85% CI does not overlap zero
 
 woodland3 <- occu( ~ as.factor(cam_moved)
                    ~ woodland_percent_1_5km, occu.urci)          
@@ -506,14 +512,15 @@ mod4 <- occu( ~ as.factor(cam_moved) ~ slope + NDVI_1_5km, occu.urci)
 mod5 <- occu( ~ as.factor(cam_moved) ~ slope + veg_cover, occu.urci)
 mod6 <- occu( ~ as.factor(cam_moved) ~ NDVI_1_5km + veg_cover, occu.urci)
 
-# Combine models in model selection table
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, det.mod)
+# Model selection
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, det.mod)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file = "Gray Fox Base Models.xlsx", 
-   # sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics
 

@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
 #should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+#is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,23 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+library(AICcmodavg)
+
 ###########################################################
 # SETUP CODE FOR BLACK-TAILED JACKRABBITS OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "jackrabbit detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "jackrabbit detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 detHist %>%
@@ -73,9 +79,9 @@ water.dist.tank <- occu( ~ dist_water_tank ~ 1, occu.leca, starts = c(-1, 0, 0))
 null.aicc - AICc(water.dist.tank, k=2) #better than null
 confint(water.dist.tank, level=0.85, type="det") #85% CI does not overlap zero 
 
-water.tank <- occu( ~ water_tank_density_0_9km
+water.tank.dense <- occu( ~ water_tank_density_0_9km
                     ~ 1, occu.leca, starts = c(-1, 0, 0))       
-null.aicc - AICc(water.tank) #worse than null
+null.aicc - AICc(water.tank.dense) #worse than null
 
 # dist water tank proceeds
 
@@ -201,15 +207,15 @@ null.aicc - AICc(stock.water.dense.season,k=2) #worse than null
 
 ##### Biotic Community Type Hypothesis Group ####
 
-woodland2 <- occu( ~ NDVI_0_9km ~  1, occu.leca)
-null.aicc - AICc(woodland2)  #better than null
-confint(woodland2, level=0.85, type="det") # 85% CI does not overlap zero 
+ndvi <- occu( ~ NDVI_0_9km ~  1, occu.leca)
+null.aicc - AICc(ndvi)  #better than null
+confint(ndvi, level=0.85, type="det") # 85% CI does not overlap zero 
 
-grass3 <- occu( ~ woodland_percent_0_9km ~ 1, occu.leca)          
-null.aicc - AICc(grass3, k=2) #better than null
-confint(grass3, level=0.85, type="det") # 85% CI does not overlap zero 
+wood <- occu( ~ woodland_percent_0_9km ~ 1, occu.leca)          
+null.aicc - AICc(wood, k=2) #better than null
+confint(wood, level=0.85, type="det") # 85% CI does not overlap zero 
 
-bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.leca, starts = c(0, 1, 0))        
+bio.com <- occu( ~ as.factor(biotic_com_2) ~ 1, occu.leca, starts = c(0, 1, 0))
 null.aicc - AICc(bio.com, k=2)  #better than null
 confint(bio.com, level=0.85, type="det") 
 # 85% CI does not overlaps zero but no support for hypothesis
@@ -273,6 +279,9 @@ null.aicc - AICc(cam.type, k=2) #worse than null
 
 # Check correlations between detection variables 
 
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
 # site-level variables 
 site.covs.cor <- site.covs %>% 
   select(sampling_period_length, veg_cover_cam_under_1m, NDVI_0_9km,
@@ -281,9 +290,18 @@ site.covs.cor <- site.covs %>%
 cor_site_covs <- cor(site.covs.cor, method='spearman') 
 # none correlated above |0.7|
 
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.RData")
+
 #  observation-level variables
-cor(obsCovs$precip.cat, obsCovs$wind)
+obs_cor <-cor(data.frame(
+  precip = as.vector(obs.covs$precip.cat),
+  wind = as.vector(obs.covs$wind)
+))
 # none correlated above |0.7|
+
+# Run this code to get correlation matrix in Excel 
+#write.xlsx(obs_cor, file="Correlations jackrabbit.xlsx") 
 
 # Null model
 mod_null <- occu( ~ 1 ~ 1, occu.leca)
@@ -317,15 +335,18 @@ mod20 <- occu( ~ wind + as.factor(precip.cat) ~ 1, occu.leca)
 mod21 <- occu( ~ wind + sampling_period_length ~ 1, occu.leca)
 
 # Model selection
-top_mods <- model.sel(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
-                      mod10, mod11, mod12, mod13, mod14, mod15, 
-                      mod16, mod17, mod18, mod19, mod20, mod21, mod_null)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, mod11, mod12, mod13, mod14, mod15, mod16, mod17,
+                    mod18, mod19, mod20, mod21, mod_null)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "mod11", "mod12", "mod13", "mod14", "mod15", 
+              "mod16", "mod17", "mod18", "mod19","mod20", "mod21", "mod_null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-#write.xlsx(top_mods, file="Jackrabbit Base Models.xlsx", 
-           #sheetName="Detection Models", append=T)  
 
 # Top model diagnostics 
 
@@ -365,9 +386,9 @@ water.dist.tank <- occu( ~ as.factor(precip.cat) + veg_cover_cam_under_1m
                          ~ dist_water_tank, occu.leca)      
 occu.null.aicc - AICc(water.dist.tank, k=2) #worse than null 
 
-water.tank <- occu( ~ as.factor(precip.cat) + veg_cover_cam_under_1m
-                    ~ water_tank_density_0_9km, occu.leca)       
-occu.null.aicc - AICc(water.tank) #worse than null
+water.tank.dense <- occu( ~ as.factor(precip.cat) + veg_cover_cam_under_1m
+                          ~ water_tank_density_0_9km, occu.leca)       
+occu.null.aicc - AICc(water.tank.dense) #worse than null
 
 #none proceed
 
@@ -400,10 +421,10 @@ tree <- occu( ~  as.factor(precip.cat) + veg_cover_cam_under_1m
 occu.null.aicc - AICc(tree) #better than null
 confint(tree, level=0.85, type="state") #85% CI does not overlap zero
 
-ndvi.site <- occu( ~ as.factor(precip.cat) + veg_cover_cam_under_1m
-                   ~ NDVI_0_9km, occu.leca)          
-occu.null.aicc - AICc(ndvi.site,k=2) #better than null
-confint(ndvi.site, level=0.85, type="state") #85% CI does not overlap zero
+ndvi <- occu( ~ as.factor(precip.cat) + veg_cover_cam_under_1m
+              ~ NDVI_0_9km, occu.leca)          
+occu.null.aicc - AICc(ndvi, k=2) #better than null
+confint(ndvi, level=0.85, type="state") #85% CI does not overlap zero
 
 shrubland <- occu( ~  as.factor(precip.cat) + veg_cover_cam_under_1m
                    ~  shrub_yucca_density, occu.leca)
@@ -467,7 +488,6 @@ occu.null.aicc - AICc(heat.load) #worse than null
 
 #none proceeds
 
-
 #################################################
 # OCCUPANCY MODEL SELECTION #
 #################################################
@@ -500,14 +520,15 @@ mod3 <- occu( ~  as.factor(precip.cat) +
                  veg_cover_cam_under_1m
               ~  woodland_percent_0_9km + slope, occu.leca)
 
-# Combine models in model selection table
-top_mods <- model.sel(det.mod, mod1, mod2, mod3)
+# Model selection
+cand.models <- list(mod1, mod2, mod3, det.mod)
+
+modnames <- c("mod1", "mod2", "mod3", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Jackrabbit Base Models.xlsx", 
-          #sheetName="Occupancy Models", append=T)  
 
 # Top model diagnostics
 
@@ -565,6 +586,9 @@ newdata <- data.frame(
     length = 102
   )
 )
+
+mod3 <- occu( ~ precip.cat + veg_cover_cam_under_1m
+              ~ woodland_percent_0_9km + slope, occu.leca)
 
 pred_det <- predict(mod3, type = "det", newdata = newdata)[
   ,c("Predicted","SE","lower","upper")

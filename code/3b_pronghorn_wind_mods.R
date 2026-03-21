@@ -339,7 +339,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_interior.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_interior.csv")
 )
 
 #### Turbine Visibility Models ####
@@ -424,7 +424,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_vis.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_vis.csv")
 )
 
 #### Turbine Distance Models ####
@@ -502,7 +502,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_dist.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_dist.csv")
 )
 
 #### Turbine Density Models ####
@@ -580,7 +580,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_density.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_density.csv")
 )
 
 #### Access Road Distance Models ####
@@ -658,7 +658,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_rd_dist.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_rd_dist.csv")
 )
 
 #### Access Road Density Models ####
@@ -737,7 +737,7 @@ wind_pairs <- list(
 final_table <- occu_model_selection(
   model_list = model_list,
   wind_pairs = wind_pairs,
-  file_name = "prong_turbine_rd_density.csv"
+  file_name = paste0(homewd, "outputs/prong_turbine_rd_density.csv")
 )
   
 ########################################################

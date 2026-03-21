@@ -7,16 +7,12 @@
 ########## Date Last Modified: 19-March-2026 ##############
 ###########################################################
 
-###########################################################
-###### NOTE:RUN THIS CODE AFTER "1_pre_model_code.R" ######
-###########################################################
-
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-#should need to change for the script to run (assuming packages are installed) 
-#is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed) 
+  #is the homewd directory on line 19.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -25,13 +21,23 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+library(unmarked)
+library(MuMIn)
+library(xlsx)
+library(AICcmodavg)
+
 ###########################################################
 # SETUP CODE FOR AMERICAN BADGER OCCUPANCY MODELS #
 ###########################################################
 
 # Read in edited .csv
-detHist <- read.csv(file = "badger detection hist.csv", 
-                    row.names = 1)
+detHist <- read.csv(file = "badger detection hist.csv", row.names = 1)
+# Read in site.covs.scaled
+site.covs.scaled <- readRDS("site_covs_scaled.RData")
+# Read in obsCovs.scaled
+obsCovs.scaled <- readRDS("obsCovs_scaled.RData")
 
 # Change from integer to numeric
 
@@ -70,9 +76,9 @@ backTransform(tata.null['state'])
 
 ##### Water Hypothesis Group ####
 
-water.tank <- occu( ~ water_tank_density_1_6_km 
+water.tank.dense <- occu( ~ water_tank_density_1_6_km 
                     ~ 1, occu.tata, starts = c(-1, 0, 0))       
-null.aicc - AICc(water.tank) #worse than null
+null.aicc - AICc(water.tank.dense) #worse than null
 
 water.dist.tank <- occu( ~ dist_water_tank 
                          ~ 1, occu.tata, starts = c(-1, 0, 0))      
@@ -98,7 +104,7 @@ days.since.rain <- occu( ~ days.since.rain ~ 1 , occu.tata)
 null.aicc - AICc(days.since.rain, k=2) #better than null
 confint(days.since.rain, level=0.85, type="det") # 85% CI does not overlap zero 
 
-rain.month<- occu( ~ rain.month ~ 1, occu.tata)    
+rain.month <- occu( ~ rain.month ~ 1, occu.tata)    
 null.aicc - AICc(rain.month, k=2) #better than null
 confint(rain.month, level=0.85, type="det") # 85% CI does not overlap zero
 
@@ -206,7 +212,7 @@ null.aicc - AICc(jackrabbit.hours,k=2) #worse than null
 vehicle.total <- occu( ~ vehicle.count ~ 1, occu.tata, starts = c(-1, -1, 0))
 null.aicc - AICc(vehicle.total,k=2) #worse than null
 
-vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.tata, starts = c(-1, -1, -1))     
+vehicle.hours <- occu( ~ vehicle.active ~ 1, occu.tata, starts = c(-1, -1, -1))
 null.aicc - AICc(vehicle.hours,k=2) #worse than null
 
 people.hours <- occu( ~ people.active ~ 1, occu.tata, starts = c(-1, 0, 0))
@@ -282,6 +288,32 @@ null.aicc - AICc(cam.type, k=2) #worse than null
   #humidity 
   #precip cat
 
+# Check correlations between detection variables 
+
+# Read in site-level covariates
+site.covs <- read.csv("site_covs.csv", nrows = 102, header = TRUE)
+
+# site-level variable correlations
+site.covs.cor <- site.covs %>% 
+  select(detection_angle, NDVI_1_6km)
+
+cor_site_covs <- cor(site.covs.cor, method='spearman')  
+# none correlated above |0.7|
+
+# Read in observation-level covariates
+obs.covs <- readRDS("obsCovs.RData")
+
+#  observation-level variables
+obs_cor <- cor(data.frame(
+  precip = as.vector(obs.covs$precip.cat),
+  humid = as.vector(obs.covs$humid),
+  rodent = as.vector(obs.covs$rodent.active)
+))
+# none correlated above |0.7|
+
+# Run this code to get correlation matrix in Excel 
+  #write.xlsx(obs_cor, file="Correlations mule deer.xlsx") 
+
 # Null model
 tata.null <- occu( ~ 1 ~ 1, occu.tata)
 
@@ -305,16 +337,17 @@ mod14 <- occu( ~ detection_angle + as.factor(precip.cat) ~ 1, occu.tata)
 mod15 <- occu( ~ humid + as.factor(precip.cat) ~ 1, occu.tata)
 
 # Model selection
-top_mods <- model.sel(
-  mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, mod10, mod11, mod12, 
-  mod13, mod14, mod15, tata.null
-)
+cand.models <- list(mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9, 
+                    mod10, mod11, mod12, mod13, mod14, mod15, tata.null)
+
+modnames <- c("mod1", "mod2", "mod3", "mod4", "mod5", "mod6", "mod7", "mod8", 
+              "mod9", "mod10", "mod11", "mod12", "mod13", "mod14", "mod15", 
+              "tata.null")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate detection models are found in Table S2.5.
-
-# Run this code to see candidate detection models 
-# write.xlsx(top_mods, file="Badger Base Models.xlsx", 
-           #sheetName="Detection Models", append=T)
 
 # Top model diagnostics
 
@@ -382,13 +415,13 @@ occu.null.aicc - AICc(veg.cov) #worse than null
 
 #### Biotic Community Type Hypothesis Group ####
 
-woodland <- occu( ~ detection_angle + as.factor(precip.cat)
+tree <- occu( ~ detection_angle + as.factor(precip.cat)
                   ~ tree_density_5_70, occu.tata)
-occu.null.aicc - AICc(woodland) #worse than null 
+occu.null.aicc - AICc(tree) #worse than null 
 
-ndvi.site <- occu( ~ detection_angle + as.factor(precip.cat)  
+ndvi <- occu( ~ detection_angle + as.factor(precip.cat)  
                    ~ NDVI_1_6km, occu.tata)          
-occu.null.aicc - AICc(ndvi.site,k=2) #worse than null 
+occu.null.aicc - AICc(ndvi, k=2) #worse than null 
 
 shrubland <- occu( ~ detection_angle + as.factor(precip.cat)
                    ~ shrub_yucca_density, occu.tata)
@@ -465,14 +498,15 @@ mod2 <- occu( ~ detection_angle + as.factor(precip.cat)
 mod3 <- occu( ~ detection_angle + as.factor(precip.cat)
               ~  vertical_cover + slope, occu.tata)
 
-# Combine models in model selection table
-top_mods <- model.sel(det.mod, mod1, mod2, mod3)
+# Model selection
+cand.models <- list(mod1, mod2, mod3, det.mod)
+
+modnames <- c("mod1", "mod2", "mod3", "det.mod")
+
+aicc_table <- aictab(cand.set = cand.models, modnames = modnames, sort = TRUE)
+print(aicc_table)
 
 # Candidate occupancy models are found in Table S2.6.
-
-# Run this code to see candidate occupancy models 
-#write.xlsx(top_mods, file="Badger Base Models.xlsx", 
-         # sheetName="Occupancy Models", append=T)
 
 # Top model diagnostics
 
