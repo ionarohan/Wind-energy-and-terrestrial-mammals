@@ -21,6 +21,11 @@ homewd = "<insert your folder here and end with a forward slash>"
 #Set wd to data folder on your local computer 
 setwd(paste0(homewd, "data/"))
 
+# Load packages 
+library(tidyverse)
+
+###########################################################
+
 # Input site-level covariates
 site.covs <- read.csv("site_covs.csv", nrows = 102, header=TRUE)
 
