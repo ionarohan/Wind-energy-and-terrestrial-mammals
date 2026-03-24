@@ -1014,9 +1014,9 @@ jack.rd.dist <- ggplot(plot_data, aes(x = turbine_rd_dist_unscaled, y = Predicte
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3, fill = "#31688E") +
   geom_line(color = "#31688E", linewidth = 1) +
   scale_x_continuous(
-    breaks = seq(0, 11000, by = 500),                     
-    labels = ifelse(seq(0, 11000, by = 500) %% 2000 == 0, 
-                    seq(0, 11000, by = 500), "")
+    breaks = seq(0, 11000, by = 2000),                     
+    labels = ifelse(seq(0, 11000, by = 2000) %% 2000 == 0, 
+                    seq(0, 11000, by = 2000), "")
   ) +
   scale_y_continuous(limits = c(0, 1)) +
   labs(x = "Distance to nearest access road (m)",
@@ -1323,10 +1323,30 @@ rd_dense_plot
 # ================================
 
 # Remove plot legends
-int_plot       <- int_plot          + theme(legend.position = "none")
-vis_plot       <- vis_plot          + theme(legend.position = "none")
-dist_plot      <- dist_plot         + theme(legend.position = "none")
-gray.fox.dense <- gray.fox.dense    + theme(legend.position = "none")
+int_plot       <- int_plot          +  
+  theme(
+  legend.position = "none",
+  axis.text  = element_text(size = 10),
+  axis.title = element_text(size = 12)
+)
+vis_plot       <- vis_plot          +   
+  theme(
+    legend.position = "none",
+    axis.text  = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  )
+dist_plot      <- dist_plot         +  
+  theme(
+    legend.position = "none",
+    axis.text  = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  )
+gray.fox.dense <- gray.fox.dense   +  
+  theme(
+    legend.position = "none",
+    axis.text  = element_text(size = 10),
+    axis.title = element_text(size = 12)
+)
 
 # Create a dummy plot for the legend 
 legend_plot <- ggplot(
@@ -1379,16 +1399,27 @@ final_figure <- plot_grid(
 final_figure
 
 # Save layout to .png
-ggsave(paste0(homewd, "figures/turbine.plots.png"), final_figure, width = 10,
-       height = 14, dpi = 300)
+ggsave(paste0(homewd, "figures/turbine.plots.png"), final_figure, 
+       width = 8, height = 7.5, dpi = 300)
 
 # ================================
 # COMBINE LAST 2 PLOTS
 # ================================
 
 # Remove plots legends 
-jack.rd.dist   <- jack.rd.dist      + theme(legend.position = "none")
-rd_dense_plot  <- rd_dense_plot     + theme(legend.position = "none")
+jack.rd.dist <- jack.rd.dist +
+  theme(
+    legend.position = "none",
+    axis.text  = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  )
+
+rd_dense_plot <- rd_dense_plot +
+  theme(
+    legend.position = "none",
+    axis.text  = element_text(size = 10),
+    axis.title = element_text(size = 12)
+  )
 
 # Create a dummy plot for the legend 
 legend_plot <- ggplot(
@@ -1439,10 +1470,10 @@ final_figure_2 <- plot_grid(
 final_figure_2
 
 # Save layout to .png
-ggsave(paste0(homewd, "figures/road.plots.png"), final_figure_2, width = 12,
-       height = 12, dpi = 300)
+ggsave(paste0(homewd, "figures/road.plots.png"), final_figure_2,  
+       width = 8, height = 3.5, dpi = 300)
 
-# Note that the two figures were combined in PowerPoint to produce Figure 2 in the manuscript
+# Note that the two figures were combined to produce Figure 2 in the manuscript
 
 ########################################################
 ######################### END ##########################

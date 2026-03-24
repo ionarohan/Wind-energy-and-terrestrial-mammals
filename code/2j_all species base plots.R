@@ -2204,6 +2204,61 @@ final_plot
 ggsave(paste0(homewd, "figures/cottontail_base_plots.png"), final_plot, 
               width = 12, height = 10, dpi = 300)
 
+# ================================
+# BASE MODEL DETECTION AND OCCUPANCY PROBABILITIES 
+# ================================
+
+# This code is used to make Figure 2
+
+# Read CSV file
+df <- read_csv("detect_occu_base.csv")
+
+# Make scatterplot with species labels
+
+df$group <- factor(df$group, levels = c("Ungulates", "Carnivores",
+                                        "Lagomorphs"))
+
+det.occu.plot <- ggplot(df, aes(x = detection, y = occupancy,
+                       shape = group, fill = group, label = species)) +
+  geom_point(size = 6, color = "black") + 
+  scale_fill_manual(values = c("Ungulates" = "white",
+                               "Carnivores" = "black",
+                               "Lagomorphs" = "gray")) +
+  scale_shape_manual(values = rep(21, length(unique(df$group)))) +
+  # Add minor ticks
+  scale_x_continuous(
+    breaks = seq(0, 0.25, 0.05),              # major ticks
+    minor_breaks = seq(0, 0.25, 0.01),        # minor ticks
+    expand = expansion(mult = c(0.1, 0.15))
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 1, 0.2),
+    expand = expansion(mult = c(0.1, 0.15))
+  ) +
+  theme_classic() +
+  theme(
+    axis.ticks.length = unit(3, "pt"),
+    axis.ticks = element_line(color = "black"),
+    axis.ticks.length.minor = unit(1.5, "pt"),
+    legend.text = element_text(size = 12),      # legend labels
+    legend.title = element_blank(),     # legend title
+    axis.title.x = element_text(size = 15),  # x-axis label
+    axis.title.y = element_text(size = 15),  # y-axis label
+    axis.text.x  = element_text(size = 12),         # x-axis tick labels
+    axis.text.y  = element_text(size = 12)        # y-axis tick labels
+  ) +
+  labs(x = "Probability of detection (p)", 
+       y = "Probability of habitat selection (ψ)", 
+       fill = "", shape = "")
+
+ggsave(
+  paste0(homewd, "figures/Figure2.png"),
+  plot   = det.occu.plot,
+  width  = 6.5,   # inches
+  height = 6,     # inches
+  dpi    = 300
+)
+
 ########################################################
 ######################### END ##########################
 ########################################################
