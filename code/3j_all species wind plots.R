@@ -1,19 +1,23 @@
 ###########################################################
-###### Code for the creation of the plots showing the #####
+## Code for: Turbine visibility is a strong predictor of ##
+## altered habitat selection by terrestrial mammals at a ##
+######## wind energy facility in central New Mexico #######
+###########################################################
+#### Script for the creation of the plots showing the #####
 ##### effects on the the wind energy variables on the #####
 #  habitat selection of terrestrial mammals in central NM #
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 19-March-2026 ##############
+########## Date Last Modified: 23-March-2026 ##############
 ###########################################################
 
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-  #should need to change for the script to run (assuming packages are installed)   #is the homewd directory on line 20.
+  #should need to change for the script to run (assuming packages are installed)   #is the homewd directory on line 24.
 
 #Set home working directory
   # e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -827,6 +831,7 @@ badger.rd.dense <- ggplot(plot_data, aes(x = turbine_rd_density_1_6km_unscaled,
   )
 
 badger.rd.dense
+  ## Warning message is okay, woodland only plotted as grassland uninformative
 
 ########################################################
 ############### STRIPED SKUNK PLOTS ####################

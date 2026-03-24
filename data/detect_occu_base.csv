@@ -1,0 +1,10 @@
+﻿species,occupancy ,detection,group 
+Mule deer,0.745,0.0519,Ungulates
+Pronghorn,0.122,0.017,Ungulates
+Coyote,0.765,0.054,Carnivores
+Kit fox,0.181,0.00533,Carnivores
+Gray fox,0.124,0.11,Carnivores
+American badger,0.379,0.0264,Carnivores
+Striped skunk,0.2,0.0147,Carnivores
+Black-tailed jackrabbit,0.87,0.179,Lagomorphs
+Desert cottontail,0.381,0.122,Lagomorphs

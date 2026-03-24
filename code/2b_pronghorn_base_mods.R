@@ -1,10 +1,15 @@
 ###########################################################
-########### Code for: base models for pronghorns ##########
+## Code for: Turbine visibility is a strong predictor of ##
+## altered habitat selection by terrestrial mammals at a ##
+######## wind energy facility in central New Mexico #######
+###########################################################
+#### This script is for the creation of the pronghorn #####
+#################### base models ##########################
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 19-March-2026 ##############
+########## Date Last Modified: 23-March-2026 ##############
 ###########################################################
 
 #Clear work environment
@@ -12,7 +17,7 @@ rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
   #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 19.
+  #is the homewd directory on line 24.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -53,8 +58,14 @@ anam.null <- occu( ~ 1 ~ 1, occu.anam, linkPsi="logit", se=TRUE,
                    control = list(maxit = 10000))
 null.aicc <- AICc(anam.null)
 
-# Null detection probability 
+# Null detection probability (Table 2)
 backTransform(anam.null['det']) 
+
+### Calculating overall detection probability if K = 38
+1-(1-0.043)^38
+
+# 81% probability of detecting a pronghorn at least once given the average
+#sampling period length at a site and the null detection model (see Table 2)
 
 # Null occupancy probability 
 backTransform(anam.null['state'])
@@ -289,7 +300,7 @@ confint(mod1, type = "state", level = 0.85)
 # CREATE THE HABITAT SELECTION (OCCUPANCY) MODEL#
 #################################################
 
-## Mule deer habitat selection hypotheses are listed in Table S2.2.
+## Pronghorn habitat selection hypotheses are listed in Table S2.2.
 
 ## Table S2.4 lists which occupancy hypothesis groups proceeded (i.e. performed 
   # better than the null occupancy model ψ(.), did not have uninformative 

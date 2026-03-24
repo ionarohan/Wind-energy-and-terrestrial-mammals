@@ -1,6 +1,6 @@
 # Wind-energy-and-terrestrial-mammals
 
-Data and code repository for "Evaluating the effects of wind energy facilities on the habitat selection of terrestrial mammals in central New Mexico" describing the effects of wind turbines and their associated access roads on the habitat selection of mule deer (Odocoileus hemionus), pronghorns (Antilocapra americana), coyotes (Canis latrans), gray foxes (Urocyon cinereoargenteus), kit foxes (Vulpes macrotis), American badgers (Taxidea taxus), striped skunks (Mephitis mephitis), black-tailed jackrabbits (Lepus californicus), and desert cottontails (Sylvilagus audubonii) from a remotely activated camera study.
+Data and code repository for "Turbine visibility is a strong predictor of altered habitat selection by terrestrial mammals at a wind energy facility in central New Mexico" describing the effects of wind turbines and their associated access roads on the habitat selection of mule deer (Odocoileus hemionus), pronghorns (Antilocapra americana), coyotes (Canis latrans), gray foxes (Urocyon cinereoargenteus), kit foxes (Vulpes macrotis), American badgers (Taxidea taxus), striped skunks (Mephitis mephitis), black-tailed jackrabbits (Lepus californicus), and desert cottontails (Sylvilagus audubonii) from a remotely activated camera study.
 
 Data Contributors: Iona M. Rohan, Theresa M. Laverty, and Jennifer K. Frey. 
 

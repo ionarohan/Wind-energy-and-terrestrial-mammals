@@ -1,12 +1,16 @@
 ###########################################################
-###### Code for the creation of the plots showing the #####
+## Code for: Turbine visibility is a strong predictor of ##
+## altered habitat selection by terrestrial mammals at a ##
+######## wind energy facility in central New Mexico #######
+###########################################################
+##### Script for the creation of the plots showing the ####
 ### effects on the the non-wind energy variables on the ###
 #  habitat selection of terrestrial mammals in central NM #
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 19-March-2026 ##############
+########## Date Last Modified: 23-March-2026 ##############
 ###########################################################
 
 #Clear work environment
@@ -14,7 +18,7 @@ rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
 #should need to change for the script to run (assuming packages are installed)
-#is the homewd directory on line 21.
+#is the homewd directory on line 25.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -717,11 +721,12 @@ seq_scaled <- (seq_unscaled - base_mean) / base_sd
 plot_data <- data.frame(
   NDVI_1_9km = seq_scaled,
   NDVI_1_9km_unscaled = seq_unscaled,
-  cam_moved = 1
+  cam_moved = 1 # set cam_moved to most common value 
 )
 
 # Predict
-preds <- predict(mod1, type = "det", newdata = plot_data)
+preds <- predict(mod1, type = "det", newdata = plot_data) 
+              #warning is okay, cam_moved set to 1
 plot_data$Predicted <- preds$Predicted
 plot_data$lower <- preds$lower
 plot_data$upper <- preds$upper
@@ -738,7 +743,7 @@ site_data <- site.covs %>%
 site_preds <- predict(mod1, type = "det", newdata = data.frame(
   NDVI_1_9km = site_data$NDVI_1_9km_scaled,
   cam_moved = site_data$cam_moved
-))
+)) #warning is okay, cam_moved set to 1
 
 site_data$Predicted <- site_preds$Predicted
 site_data$lower <- site_preds$lower

@@ -1,10 +1,15 @@
 ###########################################################
-######## Code for: base models for American badgers #######
+## Code for: Turbine visibility is a strong predictor of ##
+## altered habitat selection by terrestrial mammals at a ##
+######## wind energy facility in central New Mexico #######
+###########################################################
+## This script is for the creation of the American badger #
+#################### base models ##########################
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 19-March-2026 ##############
+########## Date Last Modified: 23-March-2026 ##############
 ###########################################################
 
 #Clear work environment
@@ -12,7 +17,7 @@ rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
   #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 19.
+  #is the homewd directory on line 24.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
@@ -54,8 +59,14 @@ tata.null <- occu( ~ 1 ~ 1, occu.tata, linkPsi="logit", se=TRUE,
                   control = list(maxit = 10000))
 null.aicc <- AICc(tata.null)
 
-# Null detection probability 
+# Null detection probability (Table 2)
 backTransform(tata.null['det'])
+
+### Calculating overall detection probability if K = 38
+1-(1-0.0413)^38
+
+# 80% probability of detecting an American badger at least once given the average
+#sampling period length at a site and the null detection model (see Table 2)
 
 # Null occupancy probability 
 backTransform(tata.null['state'])
@@ -362,7 +373,7 @@ confint(mod14, type = "det", level = 0.85)
 #CIs for detection variables - none overlap zero
 
 confint(mod14, type = "state", level = 0.85)  
-#CIs for occupancy intercept - does not overlap zero
+#CIs for occupancy intercept - overlaps zero
 
 #################################################
 # CREATE THE HABITAT SELECTION (OCCUPANCY) MODEL#

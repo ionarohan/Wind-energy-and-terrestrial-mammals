@@ -4,7 +4,15 @@ Code used for analyzing and plotting the effects of wind energy facilities on th
 
 ## Variable creation
 
-Run the "1_pre_model_code.R" script first as it sets up the variables for use in the occupancy model framework. 
+Run the "1a_pre_model_code.R" script first as it sets up the variables for use in the occupancy model framework. 
+
+## Unmodeled species
+
+The detection probabilities for the species with low detection probabilities that were not modeled can be calculated by running the "1b_unmodeled_species_detection.R" script. This code was used to create Table 2.
+
+## Turbine visibility GLMs
+
+The code for the generalized linear models to determine which variables best describe the turbine visibility variable can be run in the "1c_turbine_vis_glms.R" script. This code was used to create Tables S3.1 - S3.12 in Supporting Information 3.
 
 ## Base Models
 

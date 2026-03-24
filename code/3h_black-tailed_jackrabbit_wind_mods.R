@@ -1,18 +1,23 @@
 ###########################################################
-#### Code for: base models for black-tailed jackrabbits ###
+## Code for: Turbine visibility is a strong predictor of ##
+## altered habitat selection by terrestrial mammals at a ##
+######## wind energy facility in central New Mexico #######
+###########################################################
+######### This script is for the creation of the ##########
+########### black-tailed jackrabbit wind models ###########
 ###########################################################
 ################ Script by: Iona Rohan ####################
 ############ Contact: ionarohan12@gmail.com ###############
 ###########################################################
-########## Date Last Modified: 19-March-2026 ##############
+########## Date Last Modified: 23-March-2026 ##############
 ###########################################################
 
 #Clear work environment
 rm(list=ls())
 
 #Note: If you opened this script through the .Rproj file, the only line you 
-  #should need to change for the script to run (assuming packages are installed) 
-  #is the homewd directory on line 23.
+  #should need to change for the script to run (assuming packages are installed)
+  #is the homewd directory on line 24.
 
 #Set home working directory
   #e.g. homewd = "C:/Users/ionar/Desktop/R Repository/Wind-energy-and-terrestrial-mammals/"
