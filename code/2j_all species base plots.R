@@ -1,7 +1,7 @@
 ###########################################################
-## Code for: Turbine visibility is a strong predictor of ##
-## altered habitat selection by terrestrial mammals at a ##
-######## wind energy facility in central New Mexico #######
+## Code for: Terrestrial mammals alter habitat selection ##
+###### in response to turbine visibility at a central #####
+############## New Mexico wind energy facility ############
 ###########################################################
 ##### Script for the creation of the plots showing the ####
 ### effects on the the non-wind energy variables on the ###
